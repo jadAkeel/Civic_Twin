@@ -1,0 +1,191 @@
+{
+  "metadata": {
+    "project": "CityMind Tripoli",
+    "city": "Tripoli",
+    "country": "Lebanon",
+    "demo_data": true,
+    "data_notice": "Approximate demo seed data for the CityMind Tripoli prototype. It is not official municipal GIS data and must be validated with local sources.",
+    "coordinate_notice": "Coordinates are approximate demo centroids around Tripoli, Lebanon.",
+    "version": "phase-2-demo-2026-06-16"
+  },
+  "users": [
+    {
+      "full_name": "Demo Citizen",
+      "email": "citizen.demo@citymind.local",
+      "role": "citizen",
+      "is_active": true
+    },
+    {
+      "full_name": "Demo Municipality Admin",
+      "email": "admin.demo@citymind.local",
+      "role": "municipality_admin",
+      "is_active": true
+    },
+    {
+      "full_name": "Demo Urban Analyst",
+      "email": "analyst.demo@citymind.local",
+      "role": "analyst",
+      "is_active": true
+    }
+  ],
+  "neighborhoods": [
+    {
+      "name": "Al Mina",
+      "slug": "al-mina",
+      "description": "Demo coastal Tripoli neighborhood with mobility, waste, and green-route planning needs.",
+      "city": "Tripoli",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4471, "longitude": 35.8178 },
+      "priority_level": "high"
+    },
+    {
+      "name": "El Tal",
+      "slug": "el-tal",
+      "description": "Demo central Tripoli area with pedestrian activity, congestion, and public transport pressure.",
+      "city": "Tripoli",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4374, "longitude": 35.8365 },
+      "priority_level": "critical"
+    },
+    {
+      "name": "Bab Al Tebbaneh",
+      "slug": "bab-al-tebbaneh",
+      "description": "Demo dense urban area with waste, sidewalk, lighting, and green recovery needs.",
+      "city": "Tripoli",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4442, "longitude": 35.8434 },
+      "priority_level": "critical"
+    },
+    {
+      "name": "Jabal Mohsen",
+      "slug": "jabal-mohsen",
+      "description": "Demo hillside Tripoli area with accessibility, service pressure, and infrastructure monitoring needs.",
+      "city": "Tripoli",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4511, "longitude": 35.8503 },
+      "priority_level": "high"
+    },
+    {
+      "name": "Qoubbeh",
+      "slug": "qoubbeh",
+      "description": "Demo residential Tripoli area with road maintenance, waste collection, and school-route needs.",
+      "city": "Tripoli",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4327, "longitude": 35.8613 },
+      "priority_level": "high"
+    },
+    {
+      "name": "Abu Samra",
+      "slug": "abu-samra",
+      "description": "Demo residential Tripoli area with walking comfort, parking pressure, and pocket-park opportunities.",
+      "city": "Tripoli",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4252, "longitude": 35.8427 },
+      "priority_level": "medium"
+    },
+    {
+      "name": "Old Souks",
+      "slug": "old-souks",
+      "description": "Demo heritage-sensitive commercial area with pedestrian, lighting, and waste pressure.",
+      "city": "Tripoli",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4356, "longitude": 35.8449 },
+      "priority_level": "high"
+    },
+    {
+      "name": "Port Area",
+      "slug": "port-area",
+      "description": "Demo port-adjacent area with heavy vehicle movement, pollution exposure, and mobility conflicts.",
+      "city": "Tripoli",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4592, "longitude": 35.8221 },
+      "priority_level": "high"
+    },
+    {
+      "name": "Al Zahriyeh",
+      "slug": "al-zahriyeh",
+      "description": "Demo central Tripoli corridor included from the local knowledge base for future validation.",
+      "city": "Tripoli",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4398, "longitude": 35.8488 },
+      "priority_level": "medium"
+    }
+  ],
+  "issue_reports": [
+    { "title": "Garbage accumulation near dense residential blocks", "description": "Demo report of waste bags accumulating before pickup in Bab Al Tebbaneh.", "category": "garbage", "severity": "critical", "status": "submitted", "source": "demo_seed", "latitude": 34.4446, "longitude": 35.8439, "neighborhood_slug": "bab-al-tebbaneh", "created_by_email": "citizen.demo@citymind.local", "ai_detected_category": "garbage", "ai_confidence": 0.82 },
+    { "title": "Traffic congestion near El Tal transit activity", "description": "Demo congestion report around the central movement corridor.", "category": "traffic_obstruction", "severity": "high", "status": "validated", "source": "demo_seed", "latitude": 34.4378, "longitude": 35.837, "neighborhood_slug": "el-tal" },
+    { "title": "Broken sidewalks in Old Souks", "description": "Demo report for uneven pedestrian paths in the heritage commercial area.", "category": "broken_sidewalk", "severity": "high", "status": "in_progress", "source": "demo_seed", "latitude": 34.4359, "longitude": 35.8445, "neighborhood_slug": "old-souks" },
+    { "title": "Street lighting gap in Qoubbeh", "description": "Demo report of low night visibility on a residential walking route.", "category": "street_lighting", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.4321, "longitude": 35.8618, "neighborhood_slug": "qoubbeh" },
+    { "title": "Pollution concern near Port Area", "description": "Demo report about perceived air and noise exposure near heavy vehicle movement.", "category": "pollution", "severity": "high", "status": "validated", "source": "demo_seed", "latitude": 34.459, "longitude": 35.8225, "neighborhood_slug": "port-area" },
+    { "title": "Walkability problem in Abu Samra", "description": "Demo report of blocked pedestrian movement near residential streets.", "category": "accessibility_issue", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.4255, "longitude": 35.8423, "neighborhood_slug": "abu-samra" },
+    { "title": "Road obstacle in Al Mina", "description": "Demo report of a temporary obstacle affecting the coastal access route.", "category": "traffic_obstruction", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.4475, "longitude": 35.8184, "neighborhood_slug": "al-mina" },
+    { "title": "Public safety issue near Jabal Mohsen", "description": "Demo report of a poorly lit pedestrian stair route.", "category": "public_safety", "severity": "high", "status": "validated", "source": "demo_seed", "latitude": 34.4515, "longitude": 35.8508, "neighborhood_slug": "jabal-mohsen" },
+    { "title": "Pothole on Qoubbeh connector", "description": "Demo road condition report affecting residential vehicle movement.", "category": "pothole", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.433, "longitude": 35.8607, "neighborhood_slug": "qoubbeh" },
+    { "title": "Water leakage near Old Souks service lane", "description": "Demo report of water leakage that may affect pedestrian comfort.", "category": "water_leakage", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.4352, "longitude": 35.8453, "neighborhood_slug": "old-souks" },
+    { "title": "Garbage near Port truck route", "description": "Demo waste issue near logistics movement.", "category": "garbage", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.4585, "longitude": 35.8217, "neighborhood_slug": "port-area" },
+    { "title": "Broken sidewalk on Al Mina coastal walk", "description": "Demo sidewalk issue on a potential green mobility corridor.", "category": "broken_sidewalk", "severity": "medium", "status": "validated", "source": "demo_seed", "latitude": 34.4479, "longitude": 35.8172, "neighborhood_slug": "al-mina" },
+    { "title": "Street lighting issue in Bab Al Tebbaneh", "description": "Demo lighting problem connected to perceived walking safety.", "category": "street_lighting", "severity": "high", "status": "submitted", "source": "demo_seed", "latitude": 34.4439, "longitude": 35.8441, "neighborhood_slug": "bab-al-tebbaneh" },
+    { "title": "Accessibility barrier in Jabal Mohsen", "description": "Demo accessibility issue on a steep pedestrian path.", "category": "accessibility_issue", "severity": "high", "status": "submitted", "source": "demo_seed", "latitude": 34.4507, "longitude": 35.8512, "neighborhood_slug": "jabal-mohsen" },
+    { "title": "Traffic obstruction near El Tal crossing", "description": "Demo report of blocked crossing movement near central activity.", "category": "traffic_obstruction", "severity": "high", "status": "submitted", "source": "demo_seed", "latitude": 34.4371, "longitude": 35.8362, "neighborhood_slug": "el-tal" },
+    { "title": "Garbage overflow in Qoubbeh residential street", "description": "Demo waste collection pressure point.", "category": "garbage", "severity": "high", "status": "validated", "source": "demo_seed", "latitude": 34.4329, "longitude": 35.8621, "neighborhood_slug": "qoubbeh" },
+    { "title": "Public safety concern in Old Souks evening route", "description": "Demo report connected to lighting and pedestrian crowding.", "category": "public_safety", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.436, "longitude": 35.844, "neighborhood_slug": "old-souks" },
+    { "title": "Pollution exposure on Al Mina road", "description": "Demo air/noise concern on a busy corridor.", "category": "pollution", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.4466, "longitude": 35.8191, "neighborhood_slug": "al-mina" },
+    { "title": "Broken sidewalk near Abu Samra school route", "description": "Demo school-walking route issue.", "category": "broken_sidewalk", "severity": "high", "status": "submitted", "source": "demo_seed", "latitude": 34.4248, "longitude": 35.8428, "neighborhood_slug": "abu-samra" },
+    { "title": "Street lighting issue near Al Zahriyeh corridor", "description": "Demo visibility gap for a central Tripoli corridor.", "category": "street_lighting", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.4395, "longitude": 35.8491, "neighborhood_slug": "al-zahriyeh" }
+  ],
+  "green_metrics": [
+    { "neighborhood_slug": "al-mina", "air_quality_score": 55, "green_coverage_score": 57, "waste_cleanliness_score": 56, "walkability_score": 55, "heat_comfort_score": 62, "overall_green_score": 58, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "el-tal", "air_quality_score": 48, "green_coverage_score": 45, "waste_cleanliness_score": 57, "walkability_score": 61, "heat_comfort_score": 51, "overall_green_score": 52, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "bab-al-tebbaneh", "air_quality_score": 39, "green_coverage_score": 34, "waste_cleanliness_score": 32, "walkability_score": 38, "heat_comfort_score": 42, "overall_green_score": 41, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "jabal-mohsen", "air_quality_score": 44, "green_coverage_score": 42, "waste_cleanliness_score": 45, "walkability_score": 42, "heat_comfort_score": 46, "overall_green_score": 45, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "qoubbeh", "air_quality_score": 47, "green_coverage_score": 43, "waste_cleanliness_score": 44, "walkability_score": 47, "heat_comfort_score": 49, "overall_green_score": 49, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "abu-samra", "air_quality_score": 51, "green_coverage_score": 48, "waste_cleanliness_score": 49, "walkability_score": 52, "heat_comfort_score": 50, "overall_green_score": 50, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "old-souks", "air_quality_score": 44, "green_coverage_score": 36, "waste_cleanliness_score": 40, "walkability_score": 64, "heat_comfort_score": 43, "overall_green_score": 46, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "port-area", "air_quality_score": 38, "green_coverage_score": 41, "waste_cleanliness_score": 45, "walkability_score": 39, "heat_comfort_score": 44, "overall_green_score": 43, "measurement_date": "2026-06-16", "source": "demo_seed_assumption" },
+    { "neighborhood_slug": "al-zahriyeh", "air_quality_score": 50, "green_coverage_score": 47, "waste_cleanliness_score": 52, "walkability_score": 56, "heat_comfort_score": 51, "overall_green_score": 51, "measurement_date": "2026-06-16", "source": "demo_seed_assumption" }
+  ],
+  "walkability_metrics": [
+    { "neighborhood_slug": "al-mina", "sidewalk_quality": 55, "crossing_safety": 52, "lighting_quality": 58, "accessibility_score": 54, "slope_comfort": 76, "perceived_safety": 56, "overall_walkability_score": 55, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "el-tal", "sidewalk_quality": 59, "crossing_safety": 54, "lighting_quality": 62, "accessibility_score": 58, "slope_comfort": 72, "perceived_safety": 60, "overall_walkability_score": 61, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "bab-al-tebbaneh", "sidewalk_quality": 34, "crossing_safety": 36, "lighting_quality": 39, "accessibility_score": 37, "slope_comfort": 48, "perceived_safety": 35, "overall_walkability_score": 38, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "jabal-mohsen", "sidewalk_quality": 40, "crossing_safety": 43, "lighting_quality": 41, "accessibility_score": 36, "slope_comfort": 32, "perceived_safety": 45, "overall_walkability_score": 42, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "qoubbeh", "sidewalk_quality": 46, "crossing_safety": 45, "lighting_quality": 48, "accessibility_score": 46, "slope_comfort": 58, "perceived_safety": 47, "overall_walkability_score": 47, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "abu-samra", "sidewalk_quality": 51, "crossing_safety": 50, "lighting_quality": 53, "accessibility_score": 52, "slope_comfort": 62, "perceived_safety": 50, "overall_walkability_score": 52, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "old-souks", "sidewalk_quality": 61, "crossing_safety": 62, "lighting_quality": 60, "accessibility_score": 55, "slope_comfort": 66, "perceived_safety": 63, "overall_walkability_score": 64, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "port-area", "sidewalk_quality": 38, "crossing_safety": 36, "lighting_quality": 42, "accessibility_score": 40, "slope_comfort": 68, "perceived_safety": 37, "overall_walkability_score": 39, "measurement_date": "2026-06-16", "source": "demo_seed_assumption" },
+    { "neighborhood_slug": "al-zahriyeh", "sidewalk_quality": 54, "crossing_safety": 55, "lighting_quality": 57, "accessibility_score": 54, "slope_comfort": 69, "perceived_safety": 55, "overall_walkability_score": 56, "measurement_date": "2026-06-16", "source": "demo_seed_assumption" }
+  ],
+  "city_assets": [
+    { "name": "Al Mina Coastal Road Segment", "asset_type": "road", "status": "active", "neighborhood_slug": "al-mina", "geometry": { "type": "LineString", "coordinates": [[34.4466, 35.8171], [34.4481, 35.8192]] }, "metadata_json": { "demo": true, "source": "demo_seed" } },
+    { "name": "Old Souks Heritage Walking Path", "asset_type": "sidewalk", "status": "needs_maintenance", "neighborhood_slug": "old-souks", "geometry": { "type": "LineString", "coordinates": [[34.4352, 35.8441], [34.4361, 35.8452]] }, "metadata_json": { "demo": true, "source": "demo_seed" } },
+    { "name": "Qoubbeh Residential Street Light", "asset_type": "street_light", "status": "needs_maintenance", "neighborhood_slug": "qoubbeh", "location": { "latitude": 34.4323, "longitude": 35.8619 }, "metadata_json": { "demo": true } },
+    { "name": "Bab Al Tebbaneh Waste Container Cluster", "asset_type": "waste_container", "status": "needs_maintenance", "neighborhood_slug": "bab-al-tebbaneh", "location": { "latitude": 34.4445, "longitude": 35.8438 }, "metadata_json": { "demo": true } },
+    { "name": "Abu Samra Pocket Park Candidate", "asset_type": "park", "status": "planned", "neighborhood_slug": "abu-samra", "location": { "latitude": 34.425, "longitude": 35.8424 }, "metadata_json": { "demo": true } },
+    { "name": "Al Mina Tree Corridor Candidate", "asset_type": "tree", "status": "planned", "neighborhood_slug": "al-mina", "location": { "latitude": 34.4472, "longitude": 35.8182 }, "metadata_json": { "demo": true } },
+    { "name": "El Tal Bus Stop Candidate", "asset_type": "bus_stop", "status": "planned", "neighborhood_slug": "el-tal", "location": { "latitude": 34.4375, "longitude": 35.8368 }, "metadata_json": { "demo": true } },
+    { "name": "Old Souks Heritage Site Marker", "asset_type": "heritage_site", "status": "active", "neighborhood_slug": "old-souks", "location": { "latitude": 34.4357, "longitude": 35.845 }, "metadata_json": { "demo": true } },
+    { "name": "Jabal Mohsen Accessibility Path", "asset_type": "sidewalk", "status": "needs_maintenance", "neighborhood_slug": "jabal-mohsen", "geometry": { "type": "LineString", "coordinates": [[34.4506, 35.8504], [34.4516, 35.8512]] }, "metadata_json": { "demo": true } },
+    { "name": "Port Area Heavy Vehicle Road", "asset_type": "road", "status": "active", "neighborhood_slug": "port-area", "geometry": { "type": "LineString", "coordinates": [[34.4584, 35.8214], [34.4595, 35.8232]] }, "metadata_json": { "demo": true } }
+  ],
+  "mobility_edges": [
+    { "name": "Al Mina to El Tal demo road", "edge_type": "road", "from_label": "Al Mina", "to_label": "El Tal", "coordinates": [[34.4471, 35.8178], [34.4374, 35.8365]], "length_meters": 2300, "estimated_speed_kmh": 28, "walkability_weight": 0.55, "pollution_weight": 0.62, "safety_weight": 0.58, "accessibility_weight": 0.57 },
+    { "name": "El Tal to Old Souks pedestrian path", "edge_type": "pedestrian_path", "from_label": "El Tal", "to_label": "Old Souks", "coordinates": [[34.4374, 35.8365], [34.4356, 35.8449]], "length_meters": 980, "estimated_speed_kmh": 5, "walkability_weight": 0.68, "pollution_weight": 0.45, "safety_weight": 0.6, "accessibility_weight": 0.56 },
+    { "name": "Bab Al Tebbaneh to Jabal Mohsen service route", "edge_type": "informal_route", "from_label": "Bab Al Tebbaneh", "to_label": "Jabal Mohsen", "coordinates": [[34.4442, 35.8434], [34.4511, 35.8503]], "length_meters": 1200, "estimated_speed_kmh": 18, "walkability_weight": 0.42, "pollution_weight": 0.58, "safety_weight": 0.44, "accessibility_weight": 0.38 },
+    { "name": "Qoubbeh to Abu Samra residential connector", "edge_type": "road", "from_label": "Qoubbeh", "to_label": "Abu Samra", "coordinates": [[34.4327, 35.8613], [34.4252, 35.8427]], "length_meters": 2600, "estimated_speed_kmh": 24, "walkability_weight": 0.49, "pollution_weight": 0.55, "safety_weight": 0.52, "accessibility_weight": 0.5 },
+    { "name": "Al Mina coastal bike lane candidate", "edge_type": "bike_lane", "from_label": "Al Mina north", "to_label": "Al Mina south", "coordinates": [[34.4481, 35.8171], [34.4464, 35.8194]], "length_meters": 800, "estimated_speed_kmh": 14, "walkability_weight": 0.65, "pollution_weight": 0.48, "safety_weight": 0.61, "accessibility_weight": 0.6 }
+  ],
+  "scenarios": [
+    { "name": "Add trees in Bab Al Tebbaneh", "description": "Draft demo scenario for green recovery in a dense Tripoli area.", "neighborhood_slug": "bab-al-tebbaneh", "scenario_type": "add_trees", "status": "draft", "created_by_email": "analyst.demo@citymind.local", "actions": [{ "action_type": "ADD_TREES", "parameters_json": { "tree_count": 80, "demo": true }, "target_point": { "latitude": 34.4442, "longitude": 35.8434 } }] },
+    { "name": "Improve sidewalks in Old Souks", "description": "Draft demo scenario for heritage walkability improvements.", "neighborhood_slug": "old-souks", "scenario_type": "improve_sidewalks", "status": "draft", "created_by_email": "analyst.demo@citymind.local", "actions": [{ "action_type": "IMPROVE_SIDEWALKS", "parameters_json": { "segment_meters": 450, "demo": true }, "target_point": { "latitude": 34.4356, "longitude": 35.8449 } }] },
+    { "name": "Add bus stop near El Tal", "description": "Draft demo scenario for central public transport access.", "neighborhood_slug": "el-tal", "scenario_type": "add_bus_stop", "status": "draft", "created_by_email": "analyst.demo@citymind.local", "actions": [{ "action_type": "ADD_BUS_STOP", "parameters_json": { "stop_count": 1, "demo": true }, "target_point": { "latitude": 34.4374, "longitude": 35.8365 } }] },
+    { "name": "Improve waste collection in Qoubbeh", "description": "Draft demo scenario for residential waste pressure reduction.", "neighborhood_slug": "qoubbeh", "scenario_type": "improve_waste_collection", "status": "draft", "created_by_email": "analyst.demo@citymind.local", "actions": [{ "action_type": "IMPROVE_WASTE_COLLECTION", "parameters_json": { "collection_points": 4, "demo": true }, "target_point": { "latitude": 34.4327, "longitude": 35.8613 } }] },
+    { "name": "Add bike lane in Al Mina", "description": "Draft demo scenario for a coastal green mobility pilot.", "neighborhood_slug": "al-mina", "scenario_type": "add_bike_lane", "status": "draft", "created_by_email": "analyst.demo@citymind.local", "actions": [{ "action_type": "ADD_BIKE_LANE", "parameters_json": { "length_meters": 800, "demo": true }, "target_point": { "latitude": 34.4471, "longitude": 35.8178 } }] }
+  ],
+  "predictions": [
+    { "prediction_type": "waste_accumulation_risk", "neighborhood_slug": "bab-al-tebbaneh", "severity": "critical", "confidence_score": 0.72, "prediction_window_hours": 48, "message": "Demo rule-based placeholder: repeated waste reports indicate elevated waste accumulation risk.", "evidence_json": { "demo": true, "source": "seed_reports" } },
+    { "prediction_type": "congestion_risk", "neighborhood_slug": "el-tal", "severity": "high", "confidence_score": 0.68, "prediction_window_hours": 24, "message": "Demo rule-based placeholder: central movement pressure suggests congestion risk.", "evidence_json": { "demo": true, "source": "seed_reports" } }
+  ],
+  "ai_queries": [
+    { "user_email": "analyst.demo@citymind.local", "question": "Which Tripoli neighborhood should receive waste intervention first?", "answer": "From demo seed data only, Bab Al Tebbaneh has the strongest waste pressure signal.", "data_sources_json": { "tables": ["issue_reports", "green_metrics"], "demo": true }, "confidence_score": 0.7 }
+  ]
+}

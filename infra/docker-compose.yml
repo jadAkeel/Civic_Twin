@@ -1,0 +1,64 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-citymind}
+      POSTGRES_USER: ${POSTGRES_USER:-citymind}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-citymind}
+    ports:
+      - "5432:5432"
+    volumes:
+      - citymind_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-citymind} -d ${POSTGRES_DB:-citymind}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ../apps/api
+    environment:
+      PROJECT_NAME: ${PROJECT_NAME:-CityMind Tripoli}
+      CITY_NAME: ${CITY_NAME:-Tripoli}
+      COUNTRY_NAME: ${COUNTRY_NAME:-Lebanon}
+      APP_ENV: ${APP_ENV:-local}
+      DATABASE_URL: postgresql+psycopg://citymind:citymind@db:5432/citymind
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:${API_PORT:-8000}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      - api
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-citymind}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-citymind-local-password}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - citymind_minio_data:/data
+
+volumes:
+  citymind_postgres_data:
+  citymind_minio_data:
+
