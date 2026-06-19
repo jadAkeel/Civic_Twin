@@ -2,7 +2,7 @@ import type { GreenScoreRow, WalkabilityScoreRow } from "@/lib/api-client";
 
 export const fallbackGreenScores: GreenScoreRow[] = [
   {
-    neighborhood: "Al Mina",
+    neighborhood: "الميناء",
     neighborhood_slug: "al-mina",
     priority_level: "high",
     green_score: 57.05,
@@ -15,11 +15,11 @@ export const fallbackGreenScores: GreenScoreRow[] = [
     ],
     walkability_score: 56.4,
     measurement_date: "2026-06-16",
-    source: "local_fallback",
+    source: "احتياطي محلي",
     formula: {},
   },
   {
-    neighborhood: "Bab Al Tebbaneh",
+    neighborhood: "باب التبانة",
     neighborhood_slug: "bab-al-tebbaneh",
     priority_level: "critical",
     green_score: 36.95,
@@ -32,14 +32,14 @@ export const fallbackGreenScores: GreenScoreRow[] = [
     ],
     walkability_score: 37.15,
     measurement_date: "2026-06-16",
-    source: "local_fallback",
+    source: "احتياطي محلي",
     formula: {},
   },
 ];
 
 export const fallbackWalkabilityScores: WalkabilityScoreRow[] = [
   {
-    neighborhood: "Old Souks",
+    neighborhood: "الأسواق القديمة",
     neighborhood_slug: "old-souks",
     priority_level: "high",
     walkability_score: 61.15,
@@ -52,15 +52,24 @@ export const fallbackWalkabilityScores: WalkabilityScoreRow[] = [
       { factor: "perceived_safety", score: 63, weight: 0.1, contribution: 6.3 },
     ],
     measurement_date: "2026-06-16",
-    source: "local_fallback",
+    source: "احتياطي محلي",
     formula: {},
   },
 ];
 
 export function factorLabel(factor: string): string {
-  return factor
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase())
-    .replace("Score", "")
-    .trim();
+  const labels: Record<string, string> = {
+    air_quality_score: "جودة الهواء",
+    green_coverage_score: "الغطاء الأخضر",
+    waste_cleanliness_score: "نظافة النفايات",
+    walkability_score: "قابلية المشي",
+    heat_comfort_score: "راحة الحرارة",
+    sidewalk_quality: "جودة الأرصفة",
+    crossing_safety: "سلامة المعابر",
+    lighting_quality: "جودة الإنارة",
+    accessibility_score: "إمكانية الوصول",
+    slope_comfort: "راحة الانحدار",
+    perceived_safety: "السلامة المتصورة",
+  };
+  return labels[factor] ?? factor;
 }

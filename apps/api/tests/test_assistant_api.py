@@ -12,7 +12,7 @@ def test_assistant_answers_known_question_from_city_data() -> None:
 
     assert response.status_code == 201
     payload = response.json()
-    assert "green coverage" in payload["answer"]
+    assert "\u063a\u0637\u0627\u0621 \u0623\u062e\u0636\u0631" in payload["answer"]
     assert payload["provider"] == "mock_city_data"
     assert payload["data_sources_json"]["tables"] == ["green_metrics", "neighborhoods"]
 
@@ -24,7 +24,7 @@ def test_assistant_refuses_unavailable_city_fact() -> None:
 
     assert response.status_code == 201
     payload = response.json()
-    assert payload["answer"].startswith("Unavailable in CityMind Tripoli demo data")
+    assert payload["answer"].startswith("\u063a\u064a\u0631 \u0645\u062a\u0627\u062d \u0641\u064a \u0628\u064a\u0627\u0646\u0627\u062a CityMind Tripoli \u0627\u0644\u062a\u062c\u0631\u064a\u0628\u064a\u0629")
     assert payload["confidence_score"] == 0
 
 

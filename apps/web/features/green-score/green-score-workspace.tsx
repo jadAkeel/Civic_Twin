@@ -18,6 +18,7 @@ import {
   type ScoreBreakdownItem,
   type WalkabilityScoreRow,
 } from "@/lib/api-client";
+import { neighborhoodLabel, providerLabel, severityLabel } from "@/lib/display-labels";
 
 function scoreTone(score: number) {
   if (score < 45) return "rose";
@@ -34,11 +35,11 @@ function Breakdown({ items }: { items: ScoreBreakdownItem[] }) {
           <div className="mb-1 flex items-center justify-between gap-3 text-sm">
             <span className="font-semibold text-slate-900">{factorLabel(item.factor)}</span>
             <span className="text-slate-500">
-              {item.score}/100 x {Math.round(item.weight * 100)}%
+              {item.score}/100 × {Math.round(item.weight * 100)}%
             </span>
           </div>
           <ProgressBar value={item.contribution} tone="green" />
-          <p className="mt-1 text-xs text-slate-500">Contribution: {item.contribution.toFixed(2)}</p>
+          <p className="mt-1 text-xs text-slate-500">المساهمة: {item.contribution.toFixed(2)}</p>
         </div>
       ))}
     </div>
@@ -91,24 +92,24 @@ export function GreenScoreWorkspace() {
   return (
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Average green score" value={averageGreen.toFixed(1)} detail="Weighted Tripoli sustainability baseline" tone="green" />
-        <MetricCard label="Average walkability" value={averageWalkability.toFixed(1)} detail="Sidewalk, crossing, lighting, and access factors" tone="blue" />
-        <MetricCard label="Lowest green score" value={greenScores.at(-1)?.green_score.toFixed(1) ?? "0"} detail={greenScores.at(-1)?.neighborhood ?? "No data"} tone="rose" />
-        <MetricCard label="Score source" value={source} detail="API-backed when FastAPI is running" tone="amber" />
+        <MetricCard label="متوسط المؤشر الأخضر" value={averageGreen.toFixed(1)} detail="خط أساس مرجّح لاستدامة طرابلس" tone="green" />
+        <MetricCard label="متوسط قابلية المشي" value={averageWalkability.toFixed(1)} detail="عوامل الأرصفة والمعابر والإنارة والوصول" tone="blue" />
+        <MetricCard label="أدنى مؤشر أخضر" value={greenScores.at(-1)?.green_score.toFixed(1) ?? "0"} detail={neighborhoodLabel(greenScores.at(-1)?.neighborhood)} tone="rose" />
+        <MetricCard label="مصدر المؤشر" value={providerLabel(source)} detail="يعتمد على API عند تشغيل FastAPI" tone="amber" />
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <Panel title="Green score ranking" eyebrow="Formula output">
+        <Panel title="ترتيب المؤشر الأخضر" eyebrow="نتيجة المعادلة">
           <div className="space-y-4">
             {greenScores.map((row) => (
               <button
-                className="block w-full rounded-md border border-slate-200 p-4 text-left hover:border-teal-500"
+                className="block w-full rounded-md border border-slate-200 p-4 text-right hover:border-teal-500"
                 key={row.neighborhood_slug}
                 type="button"
                 onClick={() => setSelectedSlug(row.neighborhood_slug)}
               >
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="font-semibold text-slate-950">{row.neighborhood}</p>
+                  <p className="font-semibold text-slate-950">{neighborhoodLabel(row.neighborhood)}</p>
                   <Badge tone={scoreTone(row.green_score)}>{row.green_score.toFixed(1)}/100</Badge>
                 </div>
                 <ProgressBar value={row.green_score} tone={scoreTone(row.green_score)} />
@@ -117,17 +118,17 @@ export function GreenScoreWorkspace() {
           </div>
         </Panel>
 
-        <Panel title="Walkability baseline" eyebrow="Factor ranking">
+        <Panel title="خط أساس قابلية المشي" eyebrow="ترتيب العوامل">
           <DataTable
             rows={walkabilityScores}
             getRowKey={(row) => row.neighborhood_slug}
             columns={[
-              { header: "Area", cell: (row) => <span className="font-semibold">{row.neighborhood}</span> },
-              { header: "Walkability", cell: (row) => `${row.walkability_score.toFixed(1)}/100` },
+              { header: "المنطقة", cell: (row) => <span className="font-semibold">{neighborhoodLabel(row.neighborhood)}</span> },
+              { header: "قابلية المشي", cell: (row) => `${row.walkability_score.toFixed(1)}/100` },
               {
-                header: "Priority",
+                header: "الأولوية",
                 cell: (row) => (
-                  <Badge tone={row.priority_level === "critical" ? "rose" : "amber"}>{row.priority_level}</Badge>
+                  <Badge tone={row.priority_level === "critical" ? "rose" : "amber"}>{severityLabel(row.priority_level)}</Badge>
                 ),
               },
             ]}
@@ -138,8 +139,8 @@ export function GreenScoreWorkspace() {
       {selectedGreen ? (
         <div className="grid gap-6 xl:grid-cols-2">
           <Panel
-            title={`${selectedGreen.neighborhood} green explainability`}
-            eyebrow={`${selectedGreen.measurement_date} | ${selectedGreen.source}`}
+            title={`شرح المؤشر الأخضر في ${neighborhoodLabel(selectedGreen.neighborhood)}`}
+            eyebrow={`${selectedGreen.measurement_date} | ${providerLabel(selectedGreen.source)}`}
             action={<Badge tone={scoreTone(selectedGreen.green_score)}>{selectedGreen.green_score.toFixed(1)}</Badge>}
           >
             <Breakdown items={selectedGreen.green_breakdown} />
@@ -147,8 +148,8 @@ export function GreenScoreWorkspace() {
 
           {selectedWalkability ? (
             <Panel
-              title={`${selectedWalkability.neighborhood} walkability explainability`}
-              eyebrow={`${selectedWalkability.measurement_date} | ${selectedWalkability.source}`}
+              title={`شرح قابلية المشي في ${neighborhoodLabel(selectedWalkability.neighborhood)}`}
+              eyebrow={`${selectedWalkability.measurement_date} | ${providerLabel(selectedWalkability.source)}`}
               action={
                 <Badge tone={scoreTone(selectedWalkability.walkability_score)}>
                   {selectedWalkability.walkability_score.toFixed(1)}

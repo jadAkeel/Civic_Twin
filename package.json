@@ -5,6 +5,7 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "turbo dev",
+    "dev:local": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/dev_local.ps1",
     "build": "corepack pnpm --filter @citymind/web build",
     "lint": "corepack pnpm --filter @citymind/web lint",
     "typecheck": "corepack pnpm --filter @citymind/shared typecheck && corepack pnpm --filter @citymind/web typecheck",

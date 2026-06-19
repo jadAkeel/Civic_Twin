@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.core.seed import load_seed
 from app.modules.scenarios.engine import ACTION_RULES, simulate_scenario
 
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 
-SEED_PATH = Path(__file__).resolve().parents[5] / "data" / "tripoli_seed.json"
 _results: list[dict[str, Any]] = []
 
 
@@ -23,7 +21,7 @@ class ScenarioSimulationRequest(BaseModel):
 
 
 def _load_seed() -> dict[str, Any]:
-    return json.loads(SEED_PATH.read_text(encoding="utf-8"))
+    return load_seed()
 
 
 def reset_scenario_results_for_tests() -> None:

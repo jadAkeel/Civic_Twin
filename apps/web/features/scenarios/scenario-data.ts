@@ -13,17 +13,17 @@ export const scenarioActions = [
 ];
 
 export const scenarioNeighborhoods = [
-  { label: "Al Mina", slug: "al-mina" },
-  { label: "El Tal", slug: "el-tal" },
-  { label: "Bab Al Tebbaneh", slug: "bab-al-tebbaneh" },
-  { label: "Jabal Mohsen", slug: "jabal-mohsen" },
-  { label: "Qoubbeh", slug: "qoubbeh" },
-  { label: "Old Souks", slug: "old-souks" },
+  { label: "الميناء", slug: "al-mina" },
+  { label: "التل", slug: "el-tal" },
+  { label: "باب التبانة", slug: "bab-al-tebbaneh" },
+  { label: "جبل محسن", slug: "jabal-mohsen" },
+  { label: "القبة", slug: "qoubbeh" },
+  { label: "الأسواق القديمة", slug: "old-souks" },
 ];
 
 export const fallbackScenarioResult: ScenarioResult = {
   id: "local-scenario-1",
-  scenario_name: "Bab Al Tebbaneh waste and tree pilot",
+  scenario_name: "تجربة نفايات وأشجار في باب التبانة",
   neighborhood_slug: "bab-al-tebbaneh",
   actions: ["ADD_TREES", "IMPROVE_WASTE_COLLECTION"],
   green_score_delta: 11,
@@ -36,10 +36,21 @@ export const fallbackScenarioResult: ScenarioResult = {
   implementation_time_days: 80,
   risk_level: "medium",
   confidence_score: 0.75,
-  recommendation: "Prioritize sanitation operations with neighborhood-level monitoring.",
+  recommendation: "أعطِ الأولوية لعمليات النظافة مع مراقبة على مستوى الحي.",
   created_at: "2026-06-16T21:00:00.000Z",
 };
 
 export function actionLabel(action: string): string {
-  return action.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (character) => character.toUpperCase());
+  const labels: Record<string, string> = {
+    ADD_TREES: "إضافة أشجار",
+    ADD_BIKE_LANE: "إضافة مسار دراجات",
+    ADD_PARK: "إضافة حديقة",
+    ADD_BUS_STOP: "إضافة موقف حافلات",
+    IMPROVE_WASTE_COLLECTION: "تحسين جمع النفايات",
+    PEDESTRIANIZE_STREET: "تحويل شارع للمشاة",
+    CHANGE_TRAFFIC_FLOW: "تعديل تدفق المرور",
+    IMPROVE_SIDEWALKS: "تحسين الأرصفة",
+    IMPROVE_LIGHTING: "تحسين الإنارة",
+  };
+  return labels[action] ?? action;
 }

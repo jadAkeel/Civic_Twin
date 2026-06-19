@@ -14,6 +14,7 @@ import {
   routeTypeLabels,
 } from "@/features/mobility/mobility-data";
 import { citymindApi, type MobilityRouteComparison, type MobilityRouteOption } from "@/lib/api-client";
+import { neighborhoodLabel, providerLabel } from "@/lib/display-labels";
 import { tripoliRouteOverlays, type TripoliRouteOverlay } from "@/features/map/tripoli-map-data";
 
 function routeTone(routeType: MobilityRouteOption["route_type"]) {
@@ -36,7 +37,7 @@ function routeOverlayFromOption(route: MobilityRouteOption | undefined): Tripoli
       id: `selected-${route.route_type}`,
       name: routeTypeLabels[route.route_type],
       kind: route.route_type === "fastest" ? "traffic" : "green",
-      description: `${route.estimated_minutes.toFixed(1)} minutes, ${route.distance_meters} meters.`,
+      description: `${route.estimated_minutes.toFixed(1)} دقيقة، ${route.distance_meters} متر.`,
       coordinates,
     };
   }
@@ -74,45 +75,49 @@ export function MobilityWorkspace() {
 
   const selectedRoute = comparison.options.find((option) => option.route_type === selectedType) ?? comparison.options[0];
   const selectedOverlay = routeOverlayFromOption(selectedRoute);
-  const fastest = comparison.options.reduce(
-    (best, option) => (option.estimated_minutes < best.estimated_minutes ? option : best),
-    comparison.options[0] ?? fallbackMobilityComparison.options[0],
-  );
   const longestDistance = Math.max(...comparison.options.map((option) => option.distance_meters), 1);
 
   return (
     <div className="space-y-6">
+      <section className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+        توصية مسارات المشي غير مهيأة بعد. يلزم ربط ظل الأشجار والحرارة وجودة الأرصفة والغطاء الأخضر والمرور الحي ومزود توجيه إنتاجي قبل أن يعرض CityMind إرشادًا رسميًا.
+      </section>
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Route options" value={String(comparison.options.length)} detail="Rule-based modes over Tripoli seed edges" tone="blue" />
-        <MetricCard label="Fastest time" value={`${fastest.estimated_minutes.toFixed(1)}m`} detail={routeTypeLabels[fastest.route_type]} tone="amber" />
-        <MetricCard label="Provider" value={source} detail="Mock seed graph with future adapter shape" tone="green" />
-        <MetricCard label="Segments" value={String(selectedRoute?.segments.length ?? 0)} detail="Edges in selected route" tone="rose" />
+        <MetricCard label="التوجيه الرسمي" value="غير متاح" detail="مزود توجيه المرور غير مهيأ" tone="amber" />
+        <MetricCard label="إرشاد المشي" value="غير متاح" detail="بيانات الظل والحرارة والأرصفة مطلوبة" tone="blue" />
+        <MetricCard label="عينات تجريبية" value={String(comparison.options.length)} detail="رسم بياني بذور فقط، وليس إرشادًا رسميًا" tone="green" />
+        <MetricCard label="نموذج المرور" value="غير متصل" detail="لا يوجد تدفق حي للازدحام أو تحويل المسارات" tone="rose" />
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-        <Panel title="Route planner" eyebrow={source === "api" ? "API connected" : "Local fallback"}>
+        <Panel title="مدخلات مسار تجريبية" eyebrow={source === "api" ? "بيانات عينة من API" : "احتياطي تجريبي محلي"}>
+          <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+            تستخدم هذه الأدوات رسمًا بيانيًا تجريبيًا صغيرًا. هي لا توصي بمسار مشي أو مسار أخضر أو أسرع أو متجنب للازدحام بشكل حقيقي.
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-medium text-slate-700">
-              Origin
+              نقطة الانطلاق
               <select
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                 value={origin}
                 onChange={(event) => setOrigin(event.target.value)}
               >
                 {mobilityPoints.map((point) => (
-                  <option key={point}>{point}</option>
+                  <option key={point} value={point}>{neighborhoodLabel(point)}</option>
                 ))}
               </select>
             </label>
             <label className="text-sm font-medium text-slate-700">
-              Destination
+              الوجهة
               <select
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                 value={destination}
                 onChange={(event) => setDestination(event.target.value)}
               >
                 {mobilityPoints.map((point) => (
-                  <option key={point}>{point}</option>
+                  <option key={point} value={point}>{neighborhoodLabel(point)}</option>
                 ))}
               </select>
             </label>
@@ -121,14 +126,14 @@ export function MobilityWorkspace() {
           <div className="mt-5 grid gap-3">
             {comparison.options.map((route) => (
               <button
-                className="rounded-md border border-slate-200 bg-white p-4 text-left hover:border-teal-500"
+                className="rounded-md border border-slate-200 bg-white p-4 text-right hover:border-teal-500"
                 key={route.route_type}
                 type="button"
                 onClick={() => setSelectedType(route.route_type)}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-slate-950">{routeTypeLabels[route.route_type]}</p>
-                  <Badge tone={routeTone(route.route_type)}>{route.estimated_minutes.toFixed(1)} min</Badge>
+                  <p className="text-sm font-semibold text-slate-950">تجريبي: {routeTypeLabels[route.route_type]}</p>
+                  <Badge tone={routeTone(route.route_type)}>عينة فقط</Badge>
                 </div>
                 <div className="mt-3">
                   <ProgressBar value={(route.distance_meters / longestDistance) * 100} tone="blue" />
@@ -138,7 +143,7 @@ export function MobilityWorkspace() {
           </div>
         </Panel>
 
-        <Panel title="Route comparison" eyebrow={`${comparison.origin} to ${comparison.destination}`}>
+        <Panel title="مقارنة مسارات تجريبية" eyebrow={`${neighborhoodLabel(comparison.origin)} إلى ${neighborhoodLabel(comparison.destination)}`}>
           <CityMapCanvas
             compact
             heightClassName="mb-5 min-h-[360px]"
@@ -160,25 +165,28 @@ export function MobilityWorkspace() {
             rows={comparison.options}
             getRowKey={(row) => row.route_type}
             columns={[
-              { header: "Type", cell: (row) => <span className="font-semibold">{routeTypeLabels[row.route_type]}</span> },
-              { header: "Minutes", cell: (row) => row.estimated_minutes.toFixed(1) },
-              { header: "Distance", cell: (row) => `${row.distance_meters} m` },
-              { header: "Score", cell: (row) => row.score.toFixed(2) },
+              { header: "النوع", cell: (row) => <span className="font-semibold">{routeTypeLabels[row.route_type]}</span> },
+              { header: "الدقائق", cell: (row) => row.estimated_minutes.toFixed(1) },
+              { header: "المسافة", cell: (row) => `${row.distance_meters} م` },
+              { header: "المؤشر", cell: (row) => row.score.toFixed(2) },
             ]}
           />
 
           {selectedRoute ? (
             <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3">
-                <p className="font-semibold text-slate-950">{routeTypeLabels[selectedRoute.route_type]}</p>
-                <Badge tone={routeTone(selectedRoute.route_type)}>{selectedRoute.provider_interface}</Badge>
+                <p className="font-semibold text-slate-950">تجريبي: {routeTypeLabels[selectedRoute.route_type]}</p>
+                <Badge tone={routeTone(selectedRoute.route_type)}>{providerLabel(selectedRoute.provider_interface)}</Badge>
               </div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                مصدر بيانات توصية المسارات غير مهيأ. هذه نتيجة اختبار/تجربة فقط من بيانات البذور.
+              </p>
               <div className="mt-4 space-y-3">
                 {selectedRoute.segments.map((segment) => (
                   <div key={segment.id} className="rounded-md border border-slate-200 bg-white p-3">
                     <p className="text-sm font-semibold text-slate-950">{segment.name}</p>
                     <p className="mt-1 text-sm text-slate-600">
-                      {segment.from_label} to {segment.to_label} | {segment.length_meters} m
+                      {neighborhoodLabel(segment.from_label)} إلى {neighborhoodLabel(segment.to_label)} | {segment.length_meters} م
                     </p>
                   </div>
                 ))}

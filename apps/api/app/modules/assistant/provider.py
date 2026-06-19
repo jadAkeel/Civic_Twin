@@ -20,7 +20,7 @@ class MockCityDataProvider(AssistantProvider):
             metric = min(seed["green_metrics"], key=lambda item: item["green_coverage_score"])
             area = neighborhoods[metric["neighborhood_slug"]]["name"]
             return {
-                "answer": f"{area} has the weakest green coverage in the demo data and should be reviewed first for tree planting.",
+                "answer": f"{area} لديه أضعف غطاء أخضر في البيانات التجريبية ويجب مراجعته أولًا لزراعة الأشجار.",
                 "sources": {"tables": ["green_metrics", "neighborhoods"], "neighborhood_slug": metric["neighborhood_slug"]},
                 "confidence_score": 0.76,
             }
@@ -29,7 +29,7 @@ class MockCityDataProvider(AssistantProvider):
             open_reports = [report for report in seed["issue_reports"] if report["status"] in {"submitted", "validated", "in_progress"}]
             by_status = Counter(report["status"] for report in open_reports)
             return {
-                "answer": f"The demo data has {len(open_reports)} unresolved reports: {dict(by_status)}.",
+                "answer": f"تحتوي البيانات التجريبية على {len(open_reports)} بلاغًا غير محلول: {dict(by_status)}.",
                 "sources": {"tables": ["issue_reports"], "statuses": dict(by_status)},
                 "confidence_score": 0.82,
             }
@@ -38,20 +38,20 @@ class MockCityDataProvider(AssistantProvider):
             metric = min(seed["walkability_metrics"], key=lambda item: item["overall_walkability_score"])
             area = neighborhoods[metric["neighborhood_slug"]]["name"]
             return {
-                "answer": f"{area} has the weakest walkability baseline in the demo data at {metric['overall_walkability_score']}/100.",
+                "answer": f"{area} لديه أضعف خط أساس لقابلية المشي في البيانات التجريبية: {metric['overall_walkability_score']}/100.",
                 "sources": {"tables": ["walkability_metrics", "neighborhoods"], "neighborhood_slug": metric["neighborhood_slug"]},
                 "confidence_score": 0.8,
             }
 
         if "bab al tebbaneh" in normalized and ("intervention" in normalized or "improve" in normalized):
             return {
-                "answer": "For Bab Al Tebbaneh, the demo data supports combining waste collection improvement with tree planting.",
+                "answer": "بالنسبة إلى باب التبانة، تدعم البيانات التجريبية الجمع بين تحسين جمع النفايات وزراعة الأشجار.",
                 "sources": {"tables": ["issue_reports", "green_metrics", "scenarios"], "neighborhood_slug": "bab-al-tebbaneh"},
                 "confidence_score": 0.74,
             }
 
         return {
-            "answer": "Unavailable in CityMind Tripoli demo data. I can only answer from loaded reports, metrics, scenarios, mobility edges, and predictions.",
+            "answer": "غير متاح في بيانات CityMind Tripoli التجريبية. يمكنني الإجابة فقط من البلاغات والمؤشرات والسيناريوهات ومحاور التنقل والتوقعات المحمّلة.",
             "sources": {"available_tables": ["issue_reports", "green_metrics", "walkability_metrics", "scenarios", "mobility_edges", "predictions"]},
             "confidence_score": 0.0,
         }

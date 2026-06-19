@@ -5,10 +5,10 @@ export default function PredictionsPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="City Guardian Prediction Engine"
-        title="Tripoli rule-based risk predictions"
-        description="Auditable congestion, waste, infrastructure, heat, and service pressure risk signals with evidence JSON."
-        status="Municipality"
+        eyebrow="محرك توقعات حارس المدينة"
+        title="توقعات مخاطر طرابلس المبنية على قواعد"
+        description="إشارات مخاطر قابلة للتدقيق للازدحام والنفايات والبنية التحتية والحرارة وضغط الخدمات، مع أدلة بصيغة JSON."
+        status="البلدية"
       />
 
       <PredictionWorkspace />

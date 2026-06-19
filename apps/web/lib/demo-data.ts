@@ -35,27 +35,27 @@ export type ScenarioSignal = {
 
 export const cityKpis: Kpi[] = [
   {
-    label: "Open reports",
+    label: "بلاغات مفتوحة",
     value: "16",
-    detail: "Demo issues across priority Tripoli neighborhoods",
+    detail: "مشاكل تجريبية ضمن أحياء طرابلس ذات الأولوية",
     tone: "amber",
   },
   {
-    label: "Average green score",
+    label: "متوسط المؤشر الأخضر",
     value: "49",
-    detail: "Weighted demo baseline, not official municipal data",
+    detail: "خط أساس تجريبي مرجّح، وليس بيانات بلدية رسمية",
     tone: "green",
   },
   {
-    label: "Walkability baseline",
+    label: "خط أساس قابلية المشي",
     value: "52",
-    detail: "Old Souks and El Tal lead the current demo set",
+    detail: "الأسواق القديمة والتل في مقدمة المجموعة التجريبية الحالية",
     tone: "blue",
   },
   {
-    label: "High-risk areas",
+    label: "مناطق عالية المخاطر",
     value: "4",
-    detail: "Bab Al Tebbaneh, Qoubbeh, Old Souks, Port Area",
+    detail: "باب التبانة، القبة، الأسواق القديمة، منطقة المرفأ",
     tone: "rose",
   },
 ];
@@ -106,7 +106,7 @@ export const neighborhoodSignals: NeighborhoodSignal[] = [
 export const issueSignals: IssueSignal[] = [
   {
     id: "TRP-1024",
-    title: "Garbage accumulation near dense residential block",
+    title: "تراكم نفايات قرب كتلة سكنية كثيفة",
     neighborhood: "Bab Al Tebbaneh",
     category: "garbage",
     severity: "critical",
@@ -114,7 +114,7 @@ export const issueSignals: IssueSignal[] = [
   },
   {
     id: "TRP-1021",
-    title: "Broken sidewalk along pedestrian corridor",
+    title: "رصيف متضرر على محور مشاة",
     neighborhood: "Old Souks",
     category: "broken_sidewalk",
     severity: "high",
@@ -122,7 +122,7 @@ export const issueSignals: IssueSignal[] = [
   },
   {
     id: "TRP-1018",
-    title: "Traffic pressure near shared transport stop",
+    title: "ضغط مروري قرب موقف نقل مشترك",
     neighborhood: "El Tal",
     category: "traffic_congestion",
     severity: "high",
@@ -130,7 +130,7 @@ export const issueSignals: IssueSignal[] = [
   },
   {
     id: "TRP-1015",
-    title: "Poor lighting on walking link",
+    title: "إنارة ضعيفة على وصلة مشاة",
     neighborhood: "Jabal Mohsen",
     category: "broken_street_light",
     severity: "medium",
@@ -138,7 +138,7 @@ export const issueSignals: IssueSignal[] = [
   },
   {
     id: "TRP-1011",
-    title: "Road obstacle on neighborhood access street",
+    title: "عائق طريق على شارع وصول داخل الحي",
     neighborhood: "Qoubbeh",
     category: "road_obstacle",
     severity: "medium",
@@ -148,24 +148,24 @@ export const issueSignals: IssueSignal[] = [
 
 export const scenarioSignals: ScenarioSignal[] = [
   {
-    name: "Bab Al Tebbaneh Waste and Green Recovery",
+    name: "تعافي النفايات والخضرة في باب التبانة",
     target: "Bab Al Tebbaneh",
-    action: "Improve waste collection + add trees",
-    expectedDelta: "+9 green score",
+    action: "تحسين جمع النفايات + إضافة أشجار",
+    expectedDelta: "+9 في المؤشر الأخضر",
     risk: "Medium",
   },
   {
-    name: "El Tal Pedestrian Priority",
+    name: "أولوية المشاة في التل",
     target: "El Tal",
-    action: "Pedestrian priority + safer crossings",
-    expectedDelta: "+11 walkability",
+    action: "أولوية للمشاة + معابر أكثر أمانًا",
+    expectedDelta: "+11 في قابلية المشي",
     risk: "High",
   },
   {
-    name: "Al Mina Coastal Green Mobility",
+    name: "تنقل أخضر ساحلي في الميناء",
     target: "Al Mina",
-    action: "Bike lane + tree corridor",
-    expectedDelta: "+8 sustainable mobility",
+    action: "مسار دراجات + ممر أشجار",
+    expectedDelta: "+8 في التنقل المستدام",
     risk: "Low",
   },
 ];

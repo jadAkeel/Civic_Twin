@@ -16,6 +16,7 @@ import {
 } from "@/features/scenarios/scenario-data";
 import { tripoliRouteOverlays } from "@/features/map/tripoli-map-data";
 import { citymindApi, type ScenarioResult } from "@/lib/api-client";
+import { providerLabel, severityLabel } from "@/lib/display-labels";
 
 function riskTone(risk: ScenarioResult["risk_level"]) {
   if (risk === "high" || risk === "critical") return "rose";
@@ -23,8 +24,18 @@ function riskTone(risk: ScenarioResult["risk_level"]) {
   return "green";
 }
 
+function recommendationLabel(recommendation: string) {
+  if (recommendation.includes("Prioritize sanitation operations")) {
+    return "أعطِ الأولوية لعمليات النظافة مع مراقبة على مستوى الحي.";
+  }
+  if (recommendation.includes("Run a small Tripoli pilot")) {
+    return "نفّذ تجربة صغيرة في طرابلس قبل اعتمادها على نطاق المدينة.";
+  }
+  return recommendation;
+}
+
 export function ScenarioWorkspace() {
-  const [name, setName] = useState("Bab Al Tebbaneh waste and tree pilot");
+  const [name, setName] = useState("تجربة نفايات وأشجار في باب التبانة");
   const [neighborhoodSlug, setNeighborhoodSlug] = useState("bab-al-tebbaneh");
   const [selectedActions, setSelectedActions] = useState<string[]>(["ADD_TREES", "IMPROVE_WASTE_COLLECTION"]);
   const [results, setResults] = useState<ScenarioResult[]>([fallbackScenarioResult]);
@@ -68,17 +79,17 @@ export function ScenarioWorkspace() {
   return (
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Green delta" value={`+${latest.green_score_delta}`} detail="Projected green score movement" tone="green" />
-        <MetricCard label="Walkability delta" value={`+${latest.walkability_delta}`} detail="Pedestrian comfort change" tone="blue" />
-        <MetricCard label="Estimated cost" value={`$${Math.round(latest.estimated_cost / 1000)}k`} detail="Rule-based capital estimate" tone="amber" />
-        <MetricCard label="Risk" value={latest.risk_level} detail={`${Math.round(latest.confidence_score * 100)}% confidence`} tone="rose" />
+        <MetricCard label="تغير المؤشر الأخضر" value={`+${latest.green_score_delta}`} detail="حركة متوقعة للمؤشر الأخضر" tone="green" />
+        <MetricCard label="تغير قابلية المشي" value={`+${latest.walkability_delta}`} detail="تغير راحة المشاة" tone="blue" />
+        <MetricCard label="الكلفة التقديرية" value={`$${Math.round(latest.estimated_cost / 1000)} ألف`} detail="تقدير رأسمالي مبني على قواعد" tone="amber" />
+        <MetricCard label="الخطر" value={severityLabel(latest.risk_level)} detail={`ثقة ${Math.round(latest.confidence_score * 100)}%`} tone="rose" />
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-        <Panel title="Scenario builder" eyebrow={source === "api" ? "API connected" : "Local fallback"}>
+        <Panel title="باني السيناريو" eyebrow={source === "api" ? "واجهة API متصلة" : providerLabel(source)}>
           <div className="space-y-4">
             <label className="block text-sm font-medium text-slate-700">
-              Scenario name
+              اسم السيناريو
               <input
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                 value={name}
@@ -86,7 +97,7 @@ export function ScenarioWorkspace() {
               />
             </label>
             <label className="block text-sm font-medium text-slate-700">
-              Neighborhood
+              الحي
               <select
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                 value={neighborhoodSlug}
@@ -100,11 +111,11 @@ export function ScenarioWorkspace() {
               </select>
             </label>
             <div>
-              <p className="text-sm font-medium text-slate-700">Actions</p>
+              <p className="text-sm font-medium text-slate-700">الإجراءات</p>
               <div className="mt-2 grid gap-2">
                 {scenarioActions.map((action) => (
                   <button
-                    className={`rounded-md border px-3 py-2 text-left text-sm font-semibold ${
+                    className={`rounded-md border px-3 py-2 text-right text-sm font-semibold ${
                       selectedActions.includes(action)
                         ? "border-teal-600 bg-teal-50 text-teal-900"
                         : "border-slate-200 bg-white text-slate-700"
@@ -123,15 +134,15 @@ export function ScenarioWorkspace() {
               type="button"
               onClick={simulate}
             >
-              Simulate scenario
+              محاكاة السيناريو
             </button>
           </div>
         </Panel>
 
         <Panel
-          title="Before and after"
+          title="قبل وبعد"
           eyebrow={latest.scenario_name}
-          action={<Badge tone={riskTone(latest.risk_level)}>{latest.risk_level}</Badge>}
+          action={<Badge tone={riskTone(latest.risk_level)}>{severityLabel(latest.risk_level)}</Badge>}
         >
           <CityMapCanvas
             compact
@@ -156,12 +167,12 @@ export function ScenarioWorkspace() {
           />
           <div className="grid gap-4 sm:grid-cols-2">
             {[
-              ["Green score", latest.green_score_delta, "green"],
-              ["Air quality", latest.air_quality_delta, "blue"],
-              ["Walkability", latest.walkability_delta, "green"],
-              ["Traffic", latest.traffic_delta, "amber"],
-              ["Pollution", latest.pollution_delta, "rose"],
-              ["Temperature", latest.temperature_delta, "blue"],
+              ["المؤشر الأخضر", latest.green_score_delta, "green"],
+              ["جودة الهواء", latest.air_quality_delta, "blue"],
+              ["قابلية المشي", latest.walkability_delta, "green"],
+              ["المرور", latest.traffic_delta, "amber"],
+              ["التلوث", latest.pollution_delta, "rose"],
+              ["الحرارة", latest.temperature_delta, "blue"],
             ].map(([label, value, tone]) => (
               <div key={String(label)} className="rounded-md border border-slate-200 p-4">
                 <div className="flex justify-between gap-3 text-sm">
@@ -175,21 +186,21 @@ export function ScenarioWorkspace() {
             ))}
           </div>
           <p className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-            {latest.recommendation}
+            {recommendationLabel(latest.recommendation)}
           </p>
         </Panel>
       </div>
 
-      <Panel title="Scenario results" eyebrow="Persisted simulation outputs">
+      <Panel title="نتائج السيناريوهات" eyebrow="مخرجات محاكاة محفوظة">
         <DataTable
           rows={results}
           getRowKey={(row) => row.id}
           columns={[
-            { header: "Scenario", cell: (row) => <span className="font-semibold">{row.scenario_name}</span>, className: "min-w-[260px] px-4 py-3" },
-            { header: "Actions", cell: (row) => row.actions.length },
-            { header: "Cost", cell: (row) => `$${Math.round(row.estimated_cost).toLocaleString()}` },
-            { header: "Days", cell: (row) => row.implementation_time_days },
-            { header: "Risk", cell: (row) => <Badge tone={riskTone(row.risk_level)}>{row.risk_level}</Badge> },
+            { header: "السيناريو", cell: (row) => <span className="font-semibold">{row.scenario_name}</span>, className: "min-w-[260px] px-4 py-3" },
+            { header: "الإجراءات", cell: (row) => row.actions.length },
+            { header: "الكلفة", cell: (row) => `$${Math.round(row.estimated_cost).toLocaleString()}` },
+            { header: "الأيام", cell: (row) => row.implementation_time_days },
+            { header: "الخطر", cell: (row) => <Badge tone={riskTone(row.risk_level)}>{severityLabel(row.risk_level)}</Badge> },
           ]}
         />
       </Panel>

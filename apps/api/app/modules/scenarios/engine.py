@@ -45,9 +45,9 @@ def simulate_scenario(actions: list[str]) -> dict[str, Any]:
 
 def _recommend(actions: list[str], risk: str, confidence: float) -> str:
     if risk == "high" and confidence < 0.65:
-        return "Run a small Tripoli pilot before citywide approval."
+        return "نفّذ تجربة صغيرة في طرابلس قبل اعتمادها على نطاق المدينة."
     if "IMPROVE_WASTE_COLLECTION" in actions:
-        return "Prioritize sanitation operations with neighborhood-level monitoring."
+        return "أعطِ الأولوية لعمليات النظافة مع مراقبة على مستوى الحي."
     if "IMPROVE_SIDEWALKS" in actions or "PEDESTRIANIZE_STREET" in actions:
-        return "Coordinate implementation with pedestrian safety and accessibility audits."
-    return "Proceed as a rule-based planning candidate and validate with local stakeholders."
+        return "نسّق التنفيذ مع تدقيقات سلامة المشاة وإمكانية الوصول."
+    return "تعامل معه كمرشح تخطيطي مبني على قواعد وتحقق منه مع أصحاب المصلحة المحليين."

@@ -20,7 +20,7 @@ export type CityMindRoute = {
   label: string;
   path: string;
   module: string;
-  phase: string;
+  phase: "Resident" | "Municipality";
   status: "shell" | "planned" | "active";
   summary: string;
 };
@@ -46,15 +46,12 @@ export type HealthResponse = {
 };
 
 export type ReportCategory =
+  | "traffic_congestion"
   | "pothole"
-  | "garbage"
-  | "broken_sidewalk"
-  | "street_lighting"
-  | "water_leakage"
-  | "traffic_obstruction"
-  | "accessibility_issue"
-  | "pollution"
-  | "public_safety"
+  | "waste"
+  | "security_incident"
+  | "medical_emergency"
+  | "fire_hazard"
   | "other";
 
 export type ReportSeverity = "low" | "medium" | "high" | "critical";
@@ -67,6 +64,30 @@ export type ReportStatus =
   | "rejected"
   | "duplicate";
 
+export type ReportLocationSource = "gps" | "manual" | "map" | "demo_seed";
+
+export type ImageUploadStatus = "none" | "local_preview_only" | "stored";
+
+export type AnalysisStatus =
+  | "not_configured"
+  | "pending"
+  | "completed"
+  | "failed"
+  | "manual_review_required";
+
+export type ReportImageMetadata = {
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+};
+
+export type ReportImageAnalysis = {
+  status: AnalysisStatus;
+  provider?: string | null;
+  message: string;
+  completedAt?: string | null;
+};
+
 export type SmartReport = {
   id: string;
   title: string;
@@ -74,13 +95,17 @@ export type SmartReport = {
   category: ReportCategory;
   severity: ReportSeverity;
   status: ReportStatus;
-  neighborhood: TripoliNeighborhoodName;
-  neighborhoodSlug: string;
-  latitude: number;
-  longitude: number;
+  neighborhood: string;
+  neighborhoodSlug?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  manualLocation?: string | null;
+  locationSource: ReportLocationSource;
   imageUrl?: string | null;
-  aiDetectedCategory?: ReportCategory | null;
-  aiConfidence?: number | null;
+  imageUploadStatus: ImageUploadStatus;
+  imageMetadata?: ReportImageMetadata | null;
+  analysisStatus: AnalysisStatus;
+  imageAnalysis: ReportImageAnalysis;
   duplicateGroupId?: string | null;
   duplicateCandidates: string[];
   createdAt: string;
@@ -92,10 +117,14 @@ export type SmartReportCreateInput = {
   description: string;
   category: ReportCategory;
   severity: ReportSeverity;
-  neighborhoodSlug: string;
-  latitude: number;
-  longitude: number;
+  neighborhoodSlug?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  manualLocation?: string | null;
+  locationSource: ReportLocationSource;
   imageUrl?: string | null;
+  imageUploadStatus: ImageUploadStatus;
+  imageMetadata?: ReportImageMetadata | null;
 };
 
 export type SmartReportStatusUpdate = {

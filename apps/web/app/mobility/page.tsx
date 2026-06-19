@@ -5,10 +5,10 @@ export default function MobilityPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Smart Mobility"
-        title="Explore cleaner routes across Tripoli"
-        description="Compare fastest, greenest, safest, accessible, and walkable routes with map context for each corridor."
-        status="Resident portal"
+        eyebrow="جاهزية إرشاد المسارات"
+        title="مسارات المشي والمسارات البديلة"
+        description="مزودو التوجيه والمرور الحي والظل والحرارة وجودة الأرصفة والغطاء الأخضر غير مهيئين بعد. المسارات التجريبية مذكورة كعينات فقط."
+        status="بوابة المواطن"
       />
 
       <MobilityWorkspace />

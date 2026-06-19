@@ -1,29 +1,34 @@
 from __future__ import annotations
 
-import json
 from copy import deepcopy
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.schemas.reports import ReportCategorySuggestion, ReportCreate, ReportRead, ReportStatusUpdate
+from app.core.seed import load_seed
+from app.schemas.reports import ReportCategorySuggestion, ReportCreate, ReportImageAnalysis, ReportRead, ReportStatusUpdate
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
-SEED_PATH = Path(__file__).resolve().parents[5] / "data" / "tripoli_seed.json"
-
 CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "garbage": ("garbage", "waste", "trash", "overflow", "collection"),
-    "broken_sidewalk": ("sidewalk", "walkway", "pedestrian path", "pavement"),
-    "street_lighting": ("lighting", "light", "dark", "visibility", "night"),
-    "traffic_obstruction": ("traffic", "congestion", "blocked", "obstruction", "crossing"),
+    "waste": ("garbage", "waste", "trash", "overflow", "collection"),
+    "traffic_congestion": ("traffic", "congestion", "blocked", "obstruction", "crossing"),
     "pothole": ("pothole", "road hole", "asphalt"),
-    "water_leakage": ("water", "leak", "leakage", "pipe"),
-    "accessibility_issue": ("accessibility", "wheelchair", "barrier", "stairs", "slope"),
-    "pollution": ("pollution", "air", "noise", "smell", "exposure"),
-    "public_safety": ("safety", "unsafe", "hazard", "risk"),
+    "security_incident": ("safety", "unsafe", "hazard", "risk", "security", "incident"),
+    "medical_emergency": ("medical", "injury", "injured", "ambulance", "first aid", "red cross"),
+    "fire_hazard": ("fire", "smoke", "burning", "civil defense", "explosion"),
+}
+
+LEGACY_CATEGORY_MAP = {
+    "garbage": "waste",
+    "traffic_obstruction": "traffic_congestion",
+    "public_safety": "security_incident",
+    "broken_sidewalk": "pothole",
+    "street_lighting": "other",
+    "water_leakage": "other",
+    "accessibility_issue": "other",
+    "pollution": "other",
 }
 
 _reports: list[dict[str, Any]] | None = None
@@ -35,7 +40,7 @@ def _now() -> datetime:
 
 
 def _load_seed() -> dict[str, Any]:
-    return json.loads(SEED_PATH.read_text(encoding="utf-8"))
+    return load_seed()
 
 
 def _slug_to_name(slug: str) -> str:
@@ -43,6 +48,33 @@ def _slug_to_name(slug: str) -> str:
     if slug not in neighborhoods:
         raise HTTPException(status_code=422, detail=f"Unknown Tripoli neighborhood: {slug}")
     return str(neighborhoods[slug]["name"])
+
+
+def _canonical_category(category: str) -> str:
+    return LEGACY_CATEGORY_MAP.get(category, category)
+
+
+def _analysis_for_category(category: str) -> ReportImageAnalysis:
+    if category in {"security_incident", "medical_emergency", "fire_hazard"}:
+        agency = {
+            "security_incident": "الشرطة",
+            "medical_emergency": "الصليب الأحمر اللبناني",
+            "fire_hazard": "الدفاع المدني",
+        }[category]
+        return ReportImageAnalysis(
+            status="manual_review_required",
+            provider=None,
+            message=(
+                f"توجيه {agency} غير مهيأ. هذا البلاغ يتطلب مراجعة يدوية. "
+                "في حال وجود خطر فوري، تواصل مع خدمات الطوارئ."
+            ),
+        )
+
+    return ReportImageAnalysis(
+        status="not_configured",
+        provider=None,
+        message="خدمة تحليل الصور الآلي غير مهيأة بعد. تم إرسال هذا البلاغ من دون تحليل صور آلي.",
+    )
 
 
 def _get_neighborhoods() -> dict[str, dict[str, Any]]:
@@ -65,16 +97,20 @@ def _seed_reports() -> list[dict[str, Any]]:
                 "id": f"TRP-{1000 + index}",
                 "title": report["title"],
                 "description": report["description"],
-                "category": report["category"],
+                "category": _canonical_category(str(report["category"])),
                 "severity": report["severity"],
                 "status": report["status"],
                 "neighborhood": _slug_to_name(neighborhood_slug),
                 "neighborhood_slug": neighborhood_slug,
                 "latitude": float(report["latitude"]),
                 "longitude": float(report["longitude"]),
+                "manual_location": None,
+                "location_source": "demo_seed",
                 "image_url": report.get("image_url"),
-                "ai_detected_category": report.get("ai_detected_category"),
-                "ai_confidence": report.get("ai_confidence"),
+                "image_upload_status": "none",
+                "image_metadata": None,
+                "analysis_status": "not_configured",
+                "image_analysis": _analysis_for_category(_canonical_category(str(report["category"]))).model_dump(),
                 "duplicate_group_id": report.get("duplicate_group_id"),
                 "duplicate_candidates": [],
                 "created_at": seeded_at,
@@ -107,10 +143,10 @@ def _suggest_category(title: str, description: str) -> tuple[str, float, str]:
     best_category, score = max(scores.items(), key=lambda item: item[1])
 
     if score == 0:
-        return "other", 0.42, "No strong Tripoli issue keyword matched; using a conservative fallback."
+        return "other", 0.0, "Keyword helper only; no automated image analysis or model inference was performed."
 
-    confidence = min(0.92, 0.55 + score * 0.12)
-    return best_category, confidence, "Keyword-based local mock suggestion; no paid AI was called."
+    confidence = min(0.7, 0.45 + score * 0.08)
+    return best_category, confidence, "Keyword helper only; no automated image analysis or model inference was performed."
 
 
 def _duplicate_candidates(
@@ -127,7 +163,14 @@ def _duplicate_candidates(
             continue
         same_area = report["neighborhood_slug"] == neighborhood_slug
         same_category = report["category"] == category
-        nearby = abs(float(report["latitude"]) - latitude) <= 0.0012 and abs(float(report["longitude"]) - longitude) <= 0.0012
+        report_latitude = report.get("latitude")
+        report_longitude = report.get("longitude")
+        nearby = (
+            report_latitude is not None
+            and report_longitude is not None
+            and abs(float(report_latitude) - latitude) <= 0.0012
+            and abs(float(report_longitude) - longitude) <= 0.0012
+        )
         still_actionable = report["status"] not in {"resolved", "rejected"}
         if same_area and same_category and nearby and still_actionable:
             candidates.append(str(report["id"]))
@@ -170,14 +213,19 @@ def list_reports(
 @router.post("", response_model=ReportRead, status_code=201)
 def create_report(payload: ReportCreate) -> ReportRead:
     reports = _store()
-    category, confidence, _ = _suggest_category(payload.title, payload.description)
-    duplicates = _duplicate_candidates(
-        category=payload.category,
-        neighborhood_slug=payload.neighborhood_slug,
-        latitude=payload.latitude,
-        longitude=payload.longitude,
+    duplicates = (
+        _duplicate_candidates(
+            category=payload.category,
+            neighborhood_slug=payload.neighborhood_slug,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+        )
+        if payload.neighborhood_slug and payload.latitude is not None and payload.longitude is not None
+        else []
     )
     created_at = _now()
+    neighborhood = _slug_to_name(payload.neighborhood_slug) if payload.neighborhood_slug else "موقع يدوي في طرابلس"
+    image_analysis = _analysis_for_category(payload.category)
     report = {
         "id": f"TRP-{1001 + len(reports)}",
         "title": payload.title,
@@ -185,13 +233,17 @@ def create_report(payload: ReportCreate) -> ReportRead:
         "category": payload.category,
         "severity": payload.severity,
         "status": "submitted",
-        "neighborhood": _slug_to_name(payload.neighborhood_slug),
+        "neighborhood": neighborhood,
         "neighborhood_slug": payload.neighborhood_slug,
         "latitude": payload.latitude,
         "longitude": payload.longitude,
+        "manual_location": payload.manual_location,
+        "location_source": payload.location_source,
         "image_url": payload.image_url,
-        "ai_detected_category": category,
-        "ai_confidence": confidence,
+        "image_upload_status": payload.image_upload_status,
+        "image_metadata": payload.image_metadata.model_dump() if payload.image_metadata else None,
+        "analysis_status": image_analysis.status,
+        "image_analysis": image_analysis.model_dump(),
         "duplicate_group_id": f"duplicate:{duplicates[0]}" if duplicates else None,
         "duplicate_candidates": duplicates,
         "created_at": created_at,
@@ -227,7 +279,7 @@ def suggest_category(payload: ReportCreate) -> ReportCategorySuggestion:
         neighborhood_slug=payload.neighborhood_slug,
         latitude=payload.latitude,
         longitude=payload.longitude,
-    )
+    ) if payload.neighborhood_slug and payload.latitude is not None and payload.longitude is not None else []
     return ReportCategorySuggestion(
         category=category,
         confidence=confidence,

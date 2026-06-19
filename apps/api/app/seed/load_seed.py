@@ -6,6 +6,7 @@ from typing import Any
 from geoalchemy2 import WKTElement
 from sqlalchemy.orm import Session
 
+from app.core.seed import seed_path
 from app.db.session import SessionLocal
 from app.models import (
     AIQuery,
@@ -22,7 +23,7 @@ from app.models import (
     WalkabilityMetric,
 )
 
-SEED_PATH = Path(__file__).resolve().parents[4] / "data" / "tripoli_seed.json"
+SEED_PATH = seed_path()
 
 
 def point_wkt(latitude: float, longitude: float) -> WKTElement:
@@ -70,7 +71,12 @@ def load_seed_data(db: Session, data: dict[str, Any]) -> None:
 
     users_by_email: dict[str, User] = {}
     for item in data.get("users", []):
-        user = User(**item)
+        user = User(
+            full_name=item["full_name"],
+            email=item["email"],
+            role=item["role"],
+            is_active=item.get("is_active", True),
+        )
         db.add(user)
         users_by_email[item["email"]] = user
 

@@ -5,11 +5,12 @@ const priorityByNeighborhood = new Map<string, { name: string; slug: string; tot
 const categoryTotals = new Map<string, number>();
 
 for (const report of fallbackReports) {
+  const neighborhoodSlug = report.neighborhoodSlug ?? "manual-location";
   const current =
-    priorityByNeighborhood.get(report.neighborhoodSlug) ??
+    priorityByNeighborhood.get(neighborhoodSlug) ??
     {
       name: report.neighborhood,
-      slug: report.neighborhoodSlug,
+      slug: neighborhoodSlug,
       total: 0,
       open: 0,
       critical: 0,
@@ -17,7 +18,7 @@ for (const report of fallbackReports) {
   current.total += 1;
   if (report.status !== "resolved") current.open += 1;
   if (report.severity === "critical") current.critical += 1;
-  priorityByNeighborhood.set(report.neighborhoodSlug, current);
+  priorityByNeighborhood.set(neighborhoodSlug, current);
   categoryTotals.set(report.category, (categoryTotals.get(report.category) ?? 0) + 1);
 }
 
@@ -39,7 +40,7 @@ export const fallbackDashboardSummary: DashboardViewSummary = {
     resolved_reports: fallbackReports.filter((report) => report.status === "resolved").length,
     average_severity: 3,
     top_neighborhood: topNeighborhoods[0]?.name ?? null,
-    top_category: "garbage",
+    top_category: "waste",
   },
   top_neighborhoods: topNeighborhoods,
   top_categories: [...categoryTotals.entries()].map(([category, total]) => ({
@@ -50,7 +51,7 @@ export const fallbackDashboardSummary: DashboardViewSummary = {
     name: item.name,
     slug: item.slug,
     score: item.priority_score,
-    reason: "Fallback Tripoli report concentration from local demo tickets.",
+    reason: "تركز بلاغات طرابلس من التذاكر التجريبية المحلية.",
   })),
   recent_reports: fallbackReports,
 };

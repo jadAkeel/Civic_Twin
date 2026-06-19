@@ -6,7 +6,7 @@ import { AppShell } from "@/components/shell/app-shell";
 
 export const metadata: Metadata = {
   title: "CityMind Tripoli",
-  description: "AI-Powered Urban Digital Twin for Tripoli, Lebanon",
+  description: "منصة مدنية رقمية لمدينة طرابلس، لبنان",
 };
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="ar" dir="rtl">
       <body>
         <AppShell>{children}</AppShell>
       </body>

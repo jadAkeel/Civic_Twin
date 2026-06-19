@@ -5,10 +5,10 @@ export default function GreenScorePage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Green Score and Walkability"
-        title="Tripoli neighborhood score explainability"
-        description="Weighted green and walkability calculations with factor-level breakdowns for Tripoli neighborhoods."
-        status="Resident portal"
+        eyebrow="المؤشر الأخضر وقابلية المشي"
+        title="شرح مؤشرات أحياء طرابلس"
+        description="حسابات مرجّحة للمؤشر الأخضر وقابلية المشي مع تفصيل العوامل لكل حي في طرابلس."
+        status="بوابة المواطن"
       />
 
       <GreenScoreWorkspace />

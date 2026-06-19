@@ -1,33 +1,40 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import type {
+  ImageUploadStatus,
   ReportCategory,
-  ReportCategorySuggestion,
+  ReportImageMetadata,
+  ReportLocationSource,
   ReportSeverity,
-  ReportStatus,
   SmartReport,
   SmartReportCreateInput,
 } from "@citymind/shared";
 
 import { CityMapCanvas } from "@/components/map/city-map-canvas";
 import { Badge } from "@/components/ui/badge";
-import { DataTable } from "@/components/ui/data-table";
-import { MetricCard } from "@/components/ui/metric-card";
 import { Panel } from "@/components/ui/panel";
 import {
   categoryLabel,
   fallbackReports,
   reportCategories,
   reportSeverities,
-  reportStatuses,
   statusLabel,
   tripoliNeighborhoodOptions,
 } from "@/features/reports/report-options";
 import { citymindApi } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
+import { locationSourceLabelArabic, neighborhoodLabel } from "@/lib/display-labels";
 
 const defaultNeighborhood = tripoliNeighborhoodOptions[2];
+const tripoliBounds = {
+  minLatitude: 34.38,
+  maxLatitude: 34.49,
+  minLongitude: 35.78,
+  maxLongitude: 35.9,
+};
+const allowedImageTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+const maxImageSizeBytes = 5 * 1024 * 1024;
 
 type FormState = {
   title: string;
@@ -37,71 +44,139 @@ type FormState = {
   neighborhoodSlug: string;
   latitude: string;
   longitude: string;
-  imageUrl: string;
+  manualLocation: string;
+  locationSource: ReportLocationSource;
+  imageUploadStatus: ImageUploadStatus;
+  imageMetadata: ReportImageMetadata | null;
 };
+
+type FormErrors = Partial<Record<keyof FormState | "location" | "photo" | "submit", string>>;
 
 const initialForm: FormState = {
   title: "",
   description: "",
-  category: "garbage",
+  category: "traffic_congestion",
   severity: "medium",
-  neighborhoodSlug: defaultNeighborhood.slug,
-  latitude: String(defaultNeighborhood.latitude),
-  longitude: String(defaultNeighborhood.longitude),
-  imageUrl: "",
+  neighborhoodSlug: "",
+  latitude: "",
+  longitude: "",
+  manualLocation: "",
+  locationSource: "manual",
+  imageUploadStatus: "none",
+  imageMetadata: null,
 };
 
-function severityTone(severity: ReportSeverity) {
-  if (severity === "critical") return "rose";
-  if (severity === "high") return "amber";
-  if (severity === "medium") return "blue";
-  return "green";
+function analysisLabel(status: SmartReport["analysisStatus"]) {
+  if (status === "manual_review_required") return "يتطلب مراجعة يدوية";
+  if (status === "not_configured") return "غير مهيأ";
+  if (status === "completed") return "مكتمل";
+  if (status === "failed") return "فشل";
+  return "قيد الانتظار";
 }
 
-function statusTone(status: ReportStatus) {
-  if (status === "resolved") return "green";
-  if (status === "in_progress" || status === "validated") return "blue";
-  if (status === "duplicate" || status === "rejected") return "rose";
-  return "amber";
+function analysisTone(status: SmartReport["analysisStatus"]) {
+  if (status === "completed") return "green";
+  if (status === "failed") return "rose";
+  if (status === "manual_review_required") return "amber";
+  return "blue";
+}
+
+function analysisMessage(message: string) {
+  if (message.includes("Automated image analysis is not configured")) {
+    return "خدمة تحليل الصور الآلي غير مهيأة بعد. تم إرسال هذا البلاغ من دون تحليل صور آلي.";
+  }
+  if (message.includes("Traffic model is not connected")) {
+    return "نموذج المرور غير متصل بعد.";
+  }
+  if (message.includes("routing is not configured") || message.includes("requires manual review")) {
+    return "التوجيه الآلي للجهة المختصة غير مهيأ بعد. هذا البلاغ يتطلب مراجعة يدوية. في حال وجود خطر فوري، تواصل مع خدمات الطوارئ.";
+  }
+  return message;
+}
+
+function isInTripoliBounds(latitude: number, longitude: number) {
+  return (
+    latitude >= tripoliBounds.minLatitude &&
+    latitude <= tripoliBounds.maxLatitude &&
+    longitude >= tripoliBounds.minLongitude &&
+    longitude <= tripoliBounds.maxLongitude
+  );
+}
+
+function hasCoordinates(form: FormState) {
+  return form.latitude.trim() !== "" || form.longitude.trim() !== "";
 }
 
 function toPayload(form: FormState): SmartReportCreateInput {
+  const latitude = form.latitude.trim() ? Number(form.latitude) : null;
+  const longitude = form.longitude.trim() ? Number(form.longitude) : null;
+
   return {
     title: form.title.trim(),
     description: form.description.trim(),
     category: form.category,
     severity: form.severity,
-    neighborhoodSlug: form.neighborhoodSlug,
-    latitude: Number(form.latitude),
-    longitude: Number(form.longitude),
-    imageUrl: form.imageUrl || null,
+    neighborhoodSlug: form.neighborhoodSlug || null,
+    latitude,
+    longitude,
+    manualLocation: form.manualLocation.trim() || null,
+    locationSource: form.locationSource,
+    imageUrl: null,
+    imageUploadStatus: form.imageUploadStatus,
+    imageMetadata: form.imageMetadata,
   };
 }
 
-function updateUploadPlaceholder(file: File): string {
-  const placeholderUrl = `local://reports/${file.name}`;
-  const entry = {
-    name: file.name,
-    size: file.size,
-    type: file.type || "application/octet-stream",
-    placeholderUrl,
-    capturedAt: new Date().toISOString(),
-  };
-  const existing = JSON.parse(localStorage.getItem("citymind.reportUploads") ?? "[]") as unknown[];
-  localStorage.setItem("citymind.reportUploads", JSON.stringify([entry, ...existing].slice(0, 12)));
-  return placeholderUrl;
+function validateForm(form: FormState): FormErrors {
+  const errors: FormErrors = {};
+  const title = form.title.trim();
+  const description = form.description.trim();
+  const manualLocation = form.manualLocation.trim();
+  const coordinatesProvided = hasCoordinates(form);
+
+  if (!title || title.length < 3) {
+    errors.title = "أضف ملخصًا قصيرًا من 3 أحرف على الأقل.";
+  }
+  if (!description || description.length < 10) {
+    errors.description = "اكتب وصفًا للمشكلة من 10 أحرف على الأقل.";
+  }
+
+  if (!coordinatesProvided && !manualLocation) {
+    errors.location = "أضف موقعًا يدويًا أو شارك/حدد موقعًا على الخريطة.";
+  }
+
+  if (coordinatesProvided) {
+    const latitude = Number(form.latitude);
+    const longitude = Number(form.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      errors.location = "يجب أن تكون الإحداثيات أرقامًا صحيحة.";
+    } else if (!isInTripoliBounds(latitude, longitude)) {
+      errors.location = "يجب أن تكون الإحداثيات ضمن طرابلس أو نطاق الاختبار القريب.";
+    }
+  }
+
+  if (form.imageUploadStatus !== "none" && !form.imageMetadata) {
+    errors.photo = "بيانات الصورة مطلوبة للمعاينة المحلية.";
+  }
+
+  return errors;
+}
+
+function formatFileSize(sizeBytes: number) {
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function SmartReporterWorkspace() {
   const [reports, setReports] = useState<SmartReport[]>(fallbackReports);
-  const [selectedReportId, setSelectedReportId] = useState(fallbackReports[0]?.id ?? "");
   const [form, setForm] = useState<FormState>(initialForm);
-  const [suggestion, setSuggestion] = useState<ReportCategorySuggestion | null>(null);
+  const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiState, setApiState] = useState<"api" | "fallback">("fallback");
-  const [notice, setNotice] = useState("");
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
+  const [gpsState, setGpsState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [gpsMessage, setGpsMessage] = useState("");
+  const [confirmation, setConfirmation] = useState<SmartReport | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -111,19 +186,15 @@ export function SmartReporterWorkspace() {
       .then((apiReports) => {
         if (!mounted) return;
         setReports(apiReports);
-        setSelectedReportId(apiReports[0]?.id ?? "");
         setApiState("api");
       })
       .catch(() => {
         if (!mounted) return;
         setReports(fallbackReports);
-        setSelectedReportId(fallbackReports[0]?.id ?? "");
         setApiState("fallback");
       })
       .finally(() => {
-        if (mounted) {
-          setIsLoading(false);
-        }
+        if (mounted) setIsLoading(false);
       });
 
     return () => {
@@ -133,173 +204,195 @@ export function SmartReporterWorkspace() {
 
   useEffect(() => {
     return () => {
-      if (imagePreviewUrl) {
-        URL.revokeObjectURL(imagePreviewUrl);
-      }
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     };
   }, [imagePreviewUrl]);
 
-  const selectedNeighborhood = useMemo(
-    () => tripoliNeighborhoodOptions.find((item) => item.slug === form.neighborhoodSlug) ?? defaultNeighborhood,
-    [form.neighborhoodSlug],
-  );
-
-  const selectedReport = reports.find((report) => report.id === selectedReportId) ?? reports[0];
-  const openReports = reports.filter((report) => !["resolved", "rejected"].includes(report.status)).length;
-  const criticalReports = reports.filter((report) => report.severity === "critical").length;
-  const duplicateSignals = reports.filter((report) => report.duplicateCandidates.length > 0 || report.duplicateGroupId).length;
+  const draftLatitude = Number(form.latitude);
+  const draftLongitude = Number(form.longitude);
+  const draftPoint =
+    Number.isFinite(draftLatitude) && Number.isFinite(draftLongitude)
+      ? { latitude: draftLatitude, longitude: draftLongitude }
+      : null;
 
   function patchForm(patch: Partial<FormState>) {
     setForm((current) => ({ ...current, ...patch }));
+    setErrors((current) => ({ ...current, submit: undefined }));
   }
 
   function chooseNeighborhood(slug: string) {
     const option = tripoliNeighborhoodOptions.find((item) => item.slug === slug) ?? defaultNeighborhood;
     patchForm({
       neighborhoodSlug: option.slug,
+      manualLocation: option.displayName,
       latitude: String(option.latitude),
       longitude: String(option.longitude),
+      locationSource: "map",
     });
   }
 
-  async function suggestCategory() {
-    setNotice("");
-    const payload = toPayload(form);
-    if (!payload.title || !payload.description) {
-      setNotice("Add a title and description before asking for a category suggestion.");
+  function useGpsLocation() {
+    setErrors((current) => ({ ...current, location: undefined }));
+    setGpsMessage("سيستخدم CityMind هذا الموقع المؤقت لهذا البلاغ فقط.");
+
+    if (!navigator.geolocation) {
+      setGpsState("error");
+      setGpsMessage("خدمة GPS غير متاحة في هذا المتصفح. اكتب الموقع يدويًا بدلًا من ذلك.");
       return;
     }
 
-    try {
-      const result = await citymindApi.reports.suggestCategory(payload);
-      setSuggestion(result);
-      patchForm({ category: result.category });
-      setApiState("api");
-    } catch {
-      const text = `${payload.title} ${payload.description}`.toLowerCase();
-      const category: ReportCategory = text.includes("sidewalk")
-        ? "broken_sidewalk"
-        : text.includes("traffic")
-          ? "traffic_obstruction"
-          : text.includes("light")
-            ? "street_lighting"
-            : text.includes("water")
-              ? "water_leakage"
-              : text.includes("garbage") || text.includes("waste")
-                ? "garbage"
-                : "other";
-      setSuggestion({
-        category,
-        confidence: category === "other" ? 0.42 : 0.71,
-        rationale: "Local browser fallback suggestion while the API is offline.",
-        duplicateCandidates: [],
-      });
-      patchForm({ category });
-      setApiState("fallback");
+    setGpsState("loading");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        if (!isInTripoliBounds(latitude, longitude)) {
+          setGpsState("error");
+          setGpsMessage("الموقع المكتشف خارج نطاق اختبار طرابلس. اكتب موقع طرابلس يدويًا.");
+          return;
+        }
+
+        patchForm({
+          latitude: latitude.toFixed(6),
+          longitude: longitude.toFixed(6),
+          locationSource: "gps",
+        });
+        setGpsState("success");
+        setGpsMessage("تم توفير موقع GPS من جهاز المواطن. هذا ليس تحققًا بلديًا رسميًا.");
+      },
+      () => {
+        setGpsState("error");
+        setGpsMessage("تم رفض إذن الموقع أو أنه غير متاح. يمكنك كتابة الموقع يدويًا.");
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+    );
+  }
+
+  function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    setErrors((current) => ({ ...current, photo: undefined }));
+
+    if (!file) {
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+      setImagePreviewUrl("");
+      patchForm({ imageUploadStatus: "none", imageMetadata: null });
+      return;
     }
+
+    if (!allowedImageTypes.includes(file.type)) {
+      event.target.value = "";
+      setErrors((current) => ({ ...current, photo: "استخدم صورة JPG أو PNG أو WebP أو HEIC أو HEIF." }));
+      return;
+    }
+
+    if (file.size > maxImageSizeBytes) {
+      event.target.value = "";
+      setErrors((current) => ({ ...current, photo: "يجب ألا يتجاوز حجم الصورة 5 ميغابايت." }));
+      return;
+    }
+
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    patchForm({
+      imageUploadStatus: "local_preview_only",
+      imageMetadata: {
+        filename: file.name,
+        contentType: file.type,
+        sizeBytes: file.size,
+      },
+    });
   }
 
   async function submitReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSubmitting(true);
-    setNotice("");
+    const nextErrors = validateForm(form);
+    setErrors(nextErrors);
+    setConfirmation(null);
 
-    const payload = toPayload(form);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    setIsSubmitting(true);
     try {
-      const created = await citymindApi.reports.create(payload);
+      const created = await citymindApi.reports.create(toPayload(form));
       setReports((current) => [created, ...current]);
-      setSelectedReportId(created.id);
+      setConfirmation(created);
       setForm(initialForm);
+      setGpsState("idle");
+      setGpsMessage("");
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
       setImagePreviewUrl("");
-      setSuggestion(null);
       setApiState("api");
-      setNotice(`Created ${created.id}.`);
-    } catch {
-      const fallback: SmartReport = {
-        id: `LOCAL-${String(Date.now()).slice(-6)}`,
-        ...payload,
-        neighborhood: selectedNeighborhood.name,
-        status: "submitted",
-        imageUrl: payload.imageUrl ?? null,
-        aiDetectedCategory: suggestion?.category ?? payload.category,
-        aiConfidence: suggestion?.confidence ?? 0.46,
-        duplicateGroupId: null,
-        duplicateCandidates: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setReports((current) => [fallback, ...current]);
-      setSelectedReportId(fallback.id);
+    } catch (error) {
+      setErrors({
+        submit:
+          error instanceof Error
+            ? "لم يتم إرسال البلاغ إلى واجهة CityMind API. حاول مرة أخرى عندما تكون الخدمة متاحة."
+            : "لم يتم إرسال البلاغ.",
+      });
       setApiState("fallback");
-      setNotice(`Saved ${fallback.id} locally while the API is offline.`);
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  async function updateStatus(report: SmartReport, status: ReportStatus) {
-    setNotice("");
-    try {
-      const updated = await citymindApi.reports.updateStatus(report.id, { status });
-      setReports((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-      setApiState("api");
-    } catch {
-      setReports((current) =>
-        current.map((item) =>
-          item.id === report.id ? { ...item, status, updatedAt: new Date().toISOString() } : item,
-        ),
-      );
-      setApiState("fallback");
-    }
-  }
+  const latestReports = reports.slice(0, 4);
+  const emergencySelected = ["security_incident", "medical_emergency", "fire_hazard"].includes(form.category);
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Visible reports" value={String(reports.length)} detail="Tripoli seed and submitted tickets" tone="blue" />
-        <MetricCard label="Open queue" value={String(openReports)} detail="Submitted, validated, and active issues" tone="amber" />
-        <MetricCard label="Critical severity" value={String(criticalReports)} detail="Highest priority citizen reports" tone="rose" />
-        <MetricCard label="Duplicate signals" value={String(duplicateSignals)} detail="Potential repeat reports near existing tickets" tone="green" />
+    <div className="space-y-5">
+      <section className="rounded-md border border-teal-200 bg-teal-50 p-4 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-950">ابدأ بلاغ مواطن</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-700">
+              اختر نوع المشكلة، اكتب ما حدث، وحدد موقعًا مؤقتًا من الجهاز أو اكتب المكان يدويًا.
+            </p>
+          </div>
+          <a
+            className="inline-flex min-h-12 items-center justify-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+            href="#citizen-report-form"
+          >
+            بلّغ عن مشكلة
+          </a>
+        </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[0.95fr_1.25fr]">
-        <Panel
-          title="Citizen intake"
-          eyebrow={apiState === "api" ? "API connected" : "Local fallback"}
-          action={
-            <Badge tone={apiState === "api" ? "green" : "amber"}>{isLoading ? "Loading" : apiState}</Badge>
-          }
-        >
-          <form className="space-y-4" onSubmit={submitReport}>
-            <label className="block text-sm font-medium text-slate-700">
-              Title
-              <input
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm"
-                value={form.title}
-                onChange={(event) => patchForm({ title: event.target.value })}
-                placeholder="Garbage overflow near residential block"
-                required
-                minLength={5}
-              />
-            </label>
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="فئات بلاغات المواطنين">
+        {reportCategories.map((category) => (
+          <button
+            className={cn(
+              "min-h-20 rounded-md border p-3 text-right text-sm font-semibold shadow-sm transition",
+              form.category === category.value
+                ? "border-teal-700 bg-white text-teal-950 ring-2 ring-teal-100"
+                : "border-slate-200 bg-white text-slate-800 hover:border-teal-300",
+            )}
+            key={category.value}
+            type="button"
+            onClick={() => patchForm({ category: category.value })}
+          >
+            {category.label}
+          </button>
+        ))}
+      </section>
 
-            <label className="block text-sm font-medium text-slate-700">
-              Description
-              <textarea
-                className="mt-1 min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm"
-                value={form.description}
-                onChange={(event) => patchForm({ description: event.target.value })}
-                placeholder="Describe what is happening and what residents are affected by."
-                required
-                minLength={10}
-              />
-            </label>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Panel
+          title="بلاغ مواطن"
+          eyebrow={apiState === "api" ? "واجهة API متصلة" : "بيانات تجريبية ظاهرة"}
+          action={<Badge tone={apiState === "api" ? "green" : "amber"}>{isLoading ? "جارٍ التحميل" : apiState === "api" ? "API" : "احتياطي محلي"}</Badge>}
+        >
+          <form id="citizen-report-form" className="space-y-5" onSubmit={submitReport}>
+            {apiState === "fallback" ? (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-950">
+                واجهة API غير متصلة. قد تظهر بلاغات تجريبية، لكن البلاغ الجديد لن يُحفظ كإرسال بلدي إلا إذا قبلته واجهة API.
+              </div>
+            ) : null}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm font-medium text-slate-700">
-                Category
+                الفئة
                 <select
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm"
+                  className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 text-base text-slate-950 shadow-sm"
                   value={form.category}
                   onChange={(event) => patchForm({ category: event.target.value as ReportCategory })}
                 >
@@ -312,9 +405,9 @@ export function SmartReporterWorkspace() {
               </label>
 
               <label className="block text-sm font-medium text-slate-700">
-                Severity
+                الخطورة كما يراها المواطن
                 <select
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm"
+                  className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 text-base text-slate-950 shadow-sm"
                   value={form.severity}
                   onChange={(event) => patchForm({ severity: event.target.value as ReportSeverity })}
                 >
@@ -327,249 +420,251 @@ export function SmartReporterWorkspace() {
               </label>
             </div>
 
-            <div>
-              <p className="text-sm font-medium text-slate-700">Location</p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                {tripoliNeighborhoodOptions.map((option) => (
-                  <button
-                    className={cn(
-                      "rounded-md border px-3 py-2 text-left text-xs font-semibold transition",
-                      form.neighborhoodSlug === option.slug
-                        ? "border-teal-600 bg-teal-50 text-teal-900"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-slate-300",
-                    )}
-                    key={option.slug}
-                    type="button"
-                    onClick={() => chooseNeighborhood(option.slug)}
-                  >
-                    {option.name}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-3">
-                <CityMapCanvas
-                  compact
-                  heightClassName="min-h-[320px]"
-                  activeLayers={{
-                    neighborhoods: true,
-                    reports: true,
-                    waste: false,
-                    roads: false,
-                    lighting: false,
-                    pollution: false,
-                    greenRoutes: false,
-                    traffic: false,
-                    assets: false,
-                  }}
-                  draftPoint={{ latitude: Number(form.latitude), longitude: Number(form.longitude) }}
-                  onMapPick={(point) =>
-                    patchForm({
-                      latitude: point.latitude.toFixed(6),
-                      longitude: point.longitude.toFixed(6),
-                    })
-                  }
-                />
-                <p className="mt-2 text-xs leading-5 text-slate-500">
-                  Tap the map to set the exact report location.
-                </p>
-              </div>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="block text-xs font-semibold uppercase text-slate-500">
-                  Latitude
-                  <input
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-950"
-                    value={form.latitude}
-                    onChange={(event) => patchForm({ latitude: event.target.value })}
-                    required
-                  />
-                </label>
-                <label className="block text-xs font-semibold uppercase text-slate-500">
-                  Longitude
-                  <input
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-950"
-                    value={form.longitude}
-                    onChange={(event) => patchForm({ longitude: event.target.value })}
-                    required
-                  />
-                </label>
-              </div>
-            </div>
-
-            <label className="block text-sm font-medium text-slate-700">
-              Photo preview
-              <input
-                className="mt-1 w-full rounded-md border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-700"
-                type="file"
-                accept="image/*"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) {
-                    if (imagePreviewUrl) {
-                      URL.revokeObjectURL(imagePreviewUrl);
-                    }
-                    setImagePreviewUrl(URL.createObjectURL(file));
-                    patchForm({ imageUrl: updateUploadPlaceholder(file) });
-                  }
-                }}
-              />
-              {imagePreviewUrl ? (
-                <span className="mt-3 block overflow-hidden rounded-md border border-slate-200">
-                  <img alt="Selected report upload preview" className="h-40 w-full object-cover" src={imagePreviewUrl} />
-                </span>
-              ) : null}
-              {form.imageUrl ? <span className="mt-1 block text-xs text-slate-500">Stored locally for this demo session.</span> : null}
-            </label>
-
-            {suggestion ? (
-              <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
-                Suggested {categoryLabel(suggestion.category)} at {Math.round(suggestion.confidence * 100)}%.
-                {suggestion.duplicateCandidates.length ? ` Possible duplicates: ${suggestion.duplicateCandidates.join(", ")}.` : ""}
+            {emergencySelected ? (
+              <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-rose-950">
+                في حال وجود خطر فوري، تواصل مع خدمات الطوارئ. هذا الإصدار التجريبي من CityMind لا يرسل الشرطة أو الصليب الأحمر أو الدفاع المدني.
               </div>
             ) : null}
 
-            {notice ? <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{notice}</p> : null}
+            <label className="block text-sm font-medium text-slate-700">
+              ملخص قصير
+              <input
+                className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 text-base text-slate-950 shadow-sm"
+                value={form.title}
+                onChange={(event) => patchForm({ title: event.target.value })}
+                placeholder="الطريق مزدحم قرب التل"
+                aria-invalid={Boolean(errors.title)}
+              />
+              {errors.title ? <span className="mt-1 block text-sm text-rose-700">{errors.title}</span> : null}
+            </label>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
-                type="button"
-                onClick={suggestCategory}
-              >
-                Suggest category
-              </button>
-              <button
-                className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-                type="submit"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Submitting" : "Submit report"}
-              </button>
-            </div>
-          </form>
-        </Panel>
+            <label className="block text-sm font-medium text-slate-700">
+              الوصف
+              <textarea
+                className="mt-1 min-h-32 w-full rounded-md border border-slate-300 px-3 py-3 text-base text-slate-950 shadow-sm"
+                value={form.description}
+                onChange={(event) => patchForm({ description: event.target.value })}
+                placeholder="صف ما تراه، ومتى بدأ، ومن المتأثر."
+                aria-invalid={Boolean(errors.description)}
+              />
+              {errors.description ? <span className="mt-1 block text-sm text-rose-700">{errors.description}</span> : null}
+            </label>
 
-        <Panel title="Report queue" eyebrow="Status operations">
-          <DataTable
-            rows={reports}
-            getRowKey={(row) => row.id}
-            columns={[
-              {
-                header: "Ticket",
-                cell: (row) => (
-                  <button
-                    className="font-semibold text-teal-800 hover:text-teal-950"
-                    type="button"
-                    onClick={() => setSelectedReportId(row.id)}
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium text-slate-700">الموقع</p>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  شارك موقع GPS فقط إذا رغبت بذلك. كتابة موقع داخل طرابلس تكفي لبلاغ آمن تجريبيًا.
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  className="min-h-12 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-wait disabled:bg-slate-500"
+                  type="button"
+                  onClick={useGpsLocation}
+                  disabled={gpsState === "loading"}
+                >
+                  {gpsState === "loading" ? "جارٍ الحصول على موقع GPS" : "استخدم موقعي عبر GPS"}
+                </button>
+
+                <label className="block text-sm font-medium text-slate-700">
+                  المنطقة القريبة
+                  <select
+                    className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 text-base text-slate-950 shadow-sm"
+                    value={form.neighborhoodSlug}
+                    onChange={(event) => chooseNeighborhood(event.target.value)}
                   >
-                    {row.id}
-                  </button>
-                ),
-              },
-              { header: "Issue", cell: (row) => row.title, className: "min-w-[260px] px-4 py-3" },
-              { header: "Area", cell: (row) => row.neighborhood },
-              {
-                header: "Severity",
-                cell: (row) => <Badge tone={severityTone(row.severity)}>{row.severity}</Badge>,
-              },
-              {
-                header: "Status",
-                cell: (row) => <Badge tone={statusTone(row.status)}>{statusLabel(row.status)}</Badge>,
-              },
-            ]}
-          />
-        </Panel>
-      </div>
+                    <option value="">اختر منطقة في طرابلس</option>
+                    {tripoliNeighborhoodOptions.map((option) => (
+                      <option key={option.slug} value={option.slug}>
+                        {option.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
 
-      {selectedReport ? (
-        <Panel title={selectedReport.title} eyebrow={selectedReport.id}>
-          <div className="grid gap-5 lg:grid-cols-[1fr_0.75fr]">
-            <div>
+              {gpsMessage ? (
+                <p
+                  className={cn(
+                    "rounded-md border p-3 text-sm leading-6",
+                    gpsState === "error"
+                      ? "border-rose-200 bg-rose-50 text-rose-900"
+                      : "border-slate-200 bg-slate-50 text-slate-700",
+                  )}
+                >
+                  {gpsMessage}
+                </p>
+              ) : null}
+
+              <label className="block text-sm font-medium text-slate-700">
+                عنوان أو مكان يدوي
+                <input
+                  className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 text-base text-slate-950 shadow-sm"
+                  value={form.manualLocation}
+                  onChange={(event) => patchForm({ manualLocation: event.target.value, locationSource: "manual" })}
+                  placeholder="مثال: قرب دوار الميناء، طرابلس"
+                />
+              </label>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-xs font-semibold uppercase text-slate-500">
+                  خط العرض
+                  <input
+                    className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 text-base font-normal text-slate-950"
+                    value={form.latitude}
+                    onChange={(event) => patchForm({ latitude: event.target.value, locationSource: "map" })}
+                    inputMode="decimal"
+                  />
+                </label>
+                <label className="block text-xs font-semibold uppercase text-slate-500">
+                  خط الطول
+                  <input
+                    className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 text-base font-normal text-slate-950"
+                    value={form.longitude}
+                    onChange={(event) => patchForm({ longitude: event.target.value, locationSource: "map" })}
+                    inputMode="decimal"
+                  />
+                </label>
+              </div>
+
+              {errors.location ? <p className="text-sm text-rose-700">{errors.location}</p> : null}
+
               <CityMapCanvas
                 compact
-                heightClassName="mb-4 min-h-[320px]"
+                heightClassName="min-h-[300px]"
                 activeLayers={{
                   neighborhoods: true,
                   reports: true,
-                  waste: true,
-                  roads: true,
-                  lighting: true,
-                  pollution: true,
+                  waste: false,
+                  roads: false,
+                  lighting: false,
+                  pollution: false,
                   greenRoutes: false,
                   traffic: false,
                   assets: false,
                 }}
-                issues={[
-                  {
-                    id: selectedReport.id,
-                    title: selectedReport.title,
-                    description: selectedReport.description,
-                    category: selectedReport.category,
-                    severity: selectedReport.severity,
-                    status:
-                      selectedReport.status === "duplicate" || selectedReport.status === "rejected"
-                        ? "resolved"
-                        : selectedReport.status,
-                    neighborhood: selectedReport.neighborhood,
-                    neighborhoodSlug: selectedReport.neighborhoodSlug,
-                    latitude: selectedReport.latitude,
-                    longitude: selectedReport.longitude,
-                  },
-                ]}
+                draftPoint={draftPoint}
+                onMapPick={(point) =>
+                  patchForm({
+                    latitude: point.latitude.toFixed(6),
+                    longitude: point.longitude.toFixed(6),
+                    locationSource: "map",
+                  })
+                }
               />
-              <p className="text-sm leading-6 text-slate-700">{selectedReport.description}</p>
-              <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-md border border-slate-200 p-3">
-                  <dt className="text-xs font-semibold uppercase text-slate-500">Category</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-950">{categoryLabel(selectedReport.category)}</dd>
+              <p className="text-xs leading-5 text-slate-500">
+                طبقات الخريطة تستخدم حدودًا تجريبية تقريبية. موقع GPS، إذا تم توفيره، يأتي من جهاز المواطن.
+              </p>
+            </div>
+
+            <label className="block text-sm font-medium text-slate-700">
+              صورة اختيارية
+              <input
+                className="mt-1 min-h-12 w-full rounded-md border border-dashed border-slate-300 px-3 py-2 text-base text-slate-700"
+                type="file"
+                accept={allowedImageTypes.join(",")}
+                onChange={handlePhotoChange}
+              />
+              {imagePreviewUrl ? (
+                <span className="mt-3 block overflow-hidden rounded-md border border-slate-200">
+                  <img alt="معاينة محلية للصورة المختارة" className="h-44 w-full object-cover" src={imagePreviewUrl} />
+                </span>
+              ) : null}
+              {form.imageMetadata ? (
+                <span className="mt-2 block text-sm leading-6 text-slate-600">
+                  معاينة محلية فقط. تخزين الصور غير مهيأ. {form.imageMetadata.filename} ({formatFileSize(form.imageMetadata.sizeBytes)})
+                </span>
+              ) : (
+                <span className="mt-2 block text-sm leading-6 text-slate-500">
+                  تخزين الصور غير مهيأ بعد، لذلك تبقى الصور كمعاينة محلية وبيانات وصفية في هذه المرحلة.
+                </span>
+              )}
+              {errors.photo ? <span className="mt-1 block text-sm text-rose-700">{errors.photo}</span> : null}
+            </label>
+
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+              تحليل الصور الآلي غير مهيأ بعد. لن يتم اختراع عدد سيارات أو حجم/عمق حفر أو مخاطر نفايات أو تصنيف جرائم أو خطورة طبية أو خطورة حريق.
+            </div>
+
+            {errors.submit ? (
+              <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-rose-900">{errors.submit}</p>
+            ) : null}
+
+            <button
+              className="min-h-12 w-full rounded-md bg-teal-700 px-4 text-base font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400 sm:w-auto"
+              type="submit"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "جارٍ إرسال البلاغ" : "إرسال البلاغ"}
+            </button>
+          </form>
+        </Panel>
+
+        <aside className="space-y-5">
+          {confirmation ? (
+            <Panel title="تم إرسال البلاغ" eyebrow={confirmation.id} action={<Badge tone="green">مُرسل</Badge>}>
+              <dl className="space-y-3 text-sm">
+                <div>
+                  <dt className="font-semibold text-slate-500">رقم البلاغ</dt>
+                  <dd className="mt-1 font-semibold text-slate-950">{confirmation.id}</dd>
                 </div>
-                <div className="rounded-md border border-slate-200 p-3">
-                  <dt className="text-xs font-semibold uppercase text-slate-500">Location</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-950">
-                    {selectedReport.neighborhood} ({selectedReport.latitude.toFixed(4)}, {selectedReport.longitude.toFixed(4)})
+                <div>
+                  <dt className="font-semibold text-slate-500">الحالة</dt>
+                  <dd className="mt-1 text-slate-950">{statusLabel(confirmation.status)}</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-slate-500">مصدر الموقع</dt>
+                  <dd className="mt-1 text-slate-950">{locationSourceLabelArabic(confirmation.locationSource)}</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-slate-500">الصورة</dt>
+                  <dd className="mt-1 text-slate-950">
+                    {confirmation.imageUploadStatus === "local_preview_only"
+                      ? "بيانات معاينة محلية فقط؛ لا يوجد تخزين إنتاجي للصور."
+                      : "لم يتم تخزين صورة."}
                   </dd>
                 </div>
-                <div className="rounded-md border border-slate-200 p-3">
-                  <dt className="text-xs font-semibold uppercase text-slate-500">AI suggestion</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-950">
-                    {selectedReport.aiDetectedCategory
-                      ? `${categoryLabel(selectedReport.aiDetectedCategory)} ${selectedReport.aiConfidence ? `(${Math.round(selectedReport.aiConfidence * 100)}%)` : ""}`
-                      : "No suggestion"}
-                  </dd>
-                </div>
-                <div className="rounded-md border border-slate-200 p-3">
-                  <dt className="text-xs font-semibold uppercase text-slate-500">Duplicate check</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-950">
-                    {selectedReport.duplicateCandidates.length
-                      ? selectedReport.duplicateCandidates.join(", ")
-                      : selectedReport.duplicateGroupId ?? "No duplicate signal"}
+                <div>
+                  <dt className="font-semibold text-slate-500">التحليل</dt>
+                  <dd className="mt-1">
+                    <Badge tone={analysisTone(confirmation.analysisStatus)}>{analysisLabel(confirmation.analysisStatus)}</Badge>
+                    <p className="mt-2 leading-6 text-slate-700">{analysisMessage(confirmation.imageAnalysis.message)}</p>
                   </dd>
                 </div>
               </dl>
-            </div>
+            </Panel>
+          ) : null}
 
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-900">Update status</p>
-              <div className="mt-3 grid gap-2">
-                {reportStatuses.map((status) => (
-                  <button
-                    className={cn(
-                      "rounded-md border px-3 py-2 text-left text-sm font-semibold",
-                      selectedReport.status === status.value
-                        ? "border-teal-600 bg-white text-teal-900"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-slate-300",
-                    )}
-                    key={status.value}
-                    type="button"
-                    onClick={() => updateStatus(selectedReport, status.value)}
-                  >
-                    {status.label}
-                  </button>
-                ))}
-              </div>
+          <Panel title="إرشاد المسارات" eyebrow="حالة الإعداد">
+            <div className="space-y-3 text-sm leading-6 text-slate-700">
+              <p>توصية مسارات المشي غير مهيأة بعد.</p>
+              <p>يلزم ربط بيانات ظل الأشجار والحرارة وجودة الأرصفة والمرور الحي ومزود التوجيه قبل عرض إرشاد رسمي.</p>
+              <a className="inline-flex min-h-10 items-center rounded-md border border-slate-300 px-3 font-semibold text-slate-800" href="/mobility">
+                عرض جاهزية المسارات التجريبية
+              </a>
             </div>
-          </div>
-        </Panel>
-      ) : null}
+          </Panel>
+
+          <Panel title="آخر البلاغات" eyebrow={apiState === "api" ? "API" : "تجريبي فقط"}>
+            <div className="space-y-3">
+              {latestReports.map((report) => (
+                <div key={report.id} className="rounded-md border border-slate-200 bg-white p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-semibold text-slate-950">{report.title}</p>
+                    <Badge tone={analysisTone(report.analysisStatus)}>{analysisLabel(report.analysisStatus)}</Badge>
+                  </div>
+                  <p className="mt-1 text-xs font-semibold uppercase text-slate-500">{categoryLabel(report.category)}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {report.manualLocation || neighborhoodLabel(report.neighborhood)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </aside>
+      </div>
     </div>
   );
 }

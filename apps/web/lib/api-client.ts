@@ -1,5 +1,7 @@
 import type {
   HealthResponse,
+  ReportImageAnalysis,
+  ReportImageMetadata,
   ReportCategorySuggestion,
   SmartReport,
   SmartReportCreateInput,
@@ -7,7 +9,7 @@ import type {
 } from "@citymind/shared";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8100";
 
 type RequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
@@ -18,22 +20,43 @@ type RequestOptions = {
 type SmartReportApi = Omit<
   SmartReport,
   | "neighborhoodSlug"
+  | "manualLocation"
+  | "locationSource"
   | "imageUrl"
-  | "aiDetectedCategory"
-  | "aiConfidence"
+  | "imageUploadStatus"
+  | "imageMetadata"
+  | "analysisStatus"
+  | "imageAnalysis"
   | "duplicateGroupId"
   | "duplicateCandidates"
   | "createdAt"
   | "updatedAt"
 > & {
-  neighborhood_slug: string;
+  neighborhood_slug?: string | null;
+  manual_location?: string | null;
+  location_source: SmartReport["locationSource"];
   image_url?: string | null;
-  ai_detected_category?: SmartReport["aiDetectedCategory"];
-  ai_confidence?: number | null;
+  image_upload_status: SmartReport["imageUploadStatus"];
+  image_metadata?: ReportImageMetadataApi | null;
+  analysis_status: SmartReport["analysisStatus"];
+  image_analysis: ReportImageAnalysisApi;
   duplicate_group_id?: string | null;
   duplicate_candidates: string[];
   created_at: string;
   updated_at: string;
+};
+
+type ReportImageMetadataApi = {
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+};
+
+type ReportImageAnalysisApi = {
+  status: ReportImageAnalysis["status"];
+  provider?: string | null;
+  message: string;
+  completed_at?: string | null;
 };
 
 type ReportCategorySuggestionApi = {
@@ -196,17 +219,57 @@ export type AuthLoginResponse = {
   user: {
     full_name: string;
     email: string;
-    role: "citizen" | "municipality_admin" | "decision_maker" | "analyst";
+    role: CityMindUserRole;
     is_active: boolean;
   };
 };
 
+export type CityMindUserRole =
+  | "owner"
+  | "citizen"
+  | "municipality_admin"
+  | "decision_maker"
+  | "analyst"
+  | "police"
+  | "red_cross"
+  | "civil_defense";
+
+export type CityMindUser = {
+  full_name: string;
+  email: string;
+  role: CityMindUserRole;
+  is_active: boolean;
+  password?: string;
+};
+
 export type AdminOverview = {
+  portal_name: string;
+  role: CityMindUserRole;
+  visible_categories: Array<SmartReport["category"] | "all">;
+  visibility_note: string;
+  notification_provider_status: "not_configured";
+  official_gis_status: "not_configured";
   reports_total: number;
   assets_total: number;
   open_reports: number;
   pending_scenarios: number;
   active_predictions: number;
+  monthly_summary: {
+    month: string;
+    total_reports: number;
+    open_reports: number;
+    critical_reports: number;
+    source: string;
+  };
+  hotspots: Array<{
+    name: string;
+    slug: string;
+    category: SmartReport["category"];
+    total_reports: number;
+    open_reports: number;
+    critical_reports: number;
+    priority_score: number;
+  }>;
 };
 
 export type AdminAsset = {
@@ -248,14 +311,35 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 function toSmartReport(report: SmartReportApi): SmartReport {
   return {
     ...report,
-    neighborhoodSlug: report.neighborhood_slug,
+    neighborhoodSlug: report.neighborhood_slug ?? null,
+    manualLocation: report.manual_location ?? null,
+    locationSource: report.location_source,
     imageUrl: report.image_url ?? null,
-    aiDetectedCategory: report.ai_detected_category ?? null,
-    aiConfidence: report.ai_confidence ?? null,
+    imageUploadStatus: report.image_upload_status,
+    imageMetadata: report.image_metadata ? toReportImageMetadata(report.image_metadata) : null,
+    analysisStatus: report.analysis_status,
+    imageAnalysis: toReportImageAnalysis(report.image_analysis),
     duplicateGroupId: report.duplicate_group_id ?? null,
     duplicateCandidates: report.duplicate_candidates,
     createdAt: report.created_at,
     updatedAt: report.updated_at,
+  };
+}
+
+function toReportImageMetadata(metadata: ReportImageMetadataApi): ReportImageMetadata {
+  return {
+    filename: metadata.filename,
+    contentType: metadata.content_type,
+    sizeBytes: metadata.size_bytes,
+  };
+}
+
+function toReportImageAnalysis(analysis: ReportImageAnalysisApi): ReportImageAnalysis {
+  return {
+    status: analysis.status,
+    provider: analysis.provider ?? null,
+    message: analysis.message,
+    completedAt: analysis.completed_at ?? null,
   };
 }
 
@@ -265,10 +349,20 @@ function toReportPayload(input: SmartReportCreateInput) {
     description: input.description,
     category: input.category,
     severity: input.severity,
-    neighborhood_slug: input.neighborhoodSlug,
-    latitude: input.latitude,
-    longitude: input.longitude,
+    neighborhood_slug: input.neighborhoodSlug ?? null,
+    latitude: input.latitude ?? null,
+    longitude: input.longitude ?? null,
+    manual_location: input.manualLocation ?? null,
+    location_source: input.locationSource,
     image_url: input.imageUrl ?? null,
+    image_upload_status: input.imageUploadStatus,
+    image_metadata: input.imageMetadata
+      ? {
+          filename: input.imageMetadata.filename,
+          content_type: input.imageMetadata.contentType,
+          size_bytes: input.imageMetadata.sizeBytes,
+        }
+      : null,
   };
 }
 
@@ -345,10 +439,15 @@ export const citymindApi = {
     history: () => request<AssistantQuery[]>("/assistant/queries"),
   },
   auth: {
-    login: (email: string) =>
+    login: (email: string, password: string) =>
       request<AuthLoginResponse>("/auth/login", {
         method: "POST",
-        body: { email },
+        body: { email, password },
+      }),
+    register: (fullName: string, email: string, password: string) =>
+      request<AuthLoginResponse>("/auth/register", {
+        method: "POST",
+        body: { full_name: fullName, email, password },
       }),
   },
   admin: {
@@ -360,6 +459,10 @@ export const citymindApi = {
       request<SmartReportApi[]>("/admin/reports", {
         headers: { Authorization: `Bearer ${token}` },
       }).then((reports) => reports.map(toSmartReport)),
+    report: (token: string, id: string) =>
+      request<SmartReportApi>(`/admin/reports/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then(toSmartReport),
     updateReportStatus: (token: string, id: string, status: SmartReportStatusUpdate["status"]) =>
       request<SmartReportApi>(`/admin/reports/${id}/status`, {
         method: "PATCH",
@@ -374,6 +477,16 @@ export const citymindApi = {
       request<AdminAsset>(`/admin/assets/${id}/status`, {
         method: "PATCH",
         body: { status },
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    users: (token: string) =>
+      request<CityMindUser[]>("/admin/users", {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    upsertUser: (token: string, input: CityMindUser) =>
+      request<CityMindUser>("/admin/users", {
+        method: "POST",
+        body: input,
         headers: { Authorization: `Bearer ${token}` },
       }),
   },

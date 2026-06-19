@@ -5,18 +5,19 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
 import { citymindApi, type AssistantQuery } from "@/lib/api-client";
+import { providerLabel } from "@/lib/display-labels";
 
 const promptStarters = [
-  "Which Tripoli neighborhood needs trees first?",
-  "What intervention improves Bab Al Tebbaneh most?",
-  "Which reports are unresolved?",
-  "Where is walkability weakest?",
+  "أي حي في طرابلس يحتاج إلى أشجار أولًا؟",
+  "ما التدخل الذي يحسن باب التبانة أكثر؟",
+  "ما البلاغات التي لم تُحل بعد؟",
+  "أين قابلية المشي هي الأضعف؟",
 ];
 
 const fallbackAnswer: AssistantQuery = {
   id: "local-ai-query-1",
-  question: "Which Tripoli neighborhood needs trees first?",
-  answer: "Bab Al Tebbaneh has the weakest green coverage in the local fallback data and should be reviewed first for tree planting.",
+  question: "أي حي في طرابلس يحتاج إلى أشجار أولًا؟",
+  answer: "باب التبانة لديه أضعف غطاء أخضر في البيانات الاحتياطية المحلية، لذلك يجب مراجعته أولًا لزراعة الأشجار.",
   data_sources_json: { tables: ["green_metrics", "neighborhoods"] },
   confidence_score: 0.72,
   created_at: "2026-06-16T21:00:00.000Z",
@@ -43,7 +44,7 @@ export function AssistantWorkspace() {
           id: `local-ai-query-${Date.now()}`,
           question,
           created_at: new Date().toISOString(),
-          answer: "Unavailable while the API is offline. The assistant only answers from CityMind Tripoli demo data.",
+          answer: "غير متاح أثناء توقف واجهة API. يجيب المساعد فقط من بيانات CityMind Tripoli التجريبية.",
         },
         ...current,
       ]);
@@ -55,12 +56,12 @@ export function AssistantWorkspace() {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-      <Panel title="Prompt starters" eyebrow="Tripoli questions">
+      <Panel title="أسئلة جاهزة" eyebrow="أسئلة عن طرابلس">
         <div className="grid gap-3">
           {promptStarters.map((starter) => (
             <button
               key={starter}
-              className="rounded-md border border-slate-200 bg-slate-50 p-4 text-left text-sm font-medium text-slate-800 hover:border-teal-500"
+              className="rounded-md border border-slate-200 bg-slate-50 p-4 text-right text-sm font-medium text-slate-800 hover:border-teal-500"
               type="button"
               onClick={() => setQuestion(starter)}
             >
@@ -70,7 +71,7 @@ export function AssistantWorkspace() {
         </div>
       </Panel>
 
-      <Panel title="Assistant conversation" eyebrow="Data-grounded responses" action={<Badge tone={source === "api" ? "green" : "amber"}>{source}</Badge>}>
+      <Panel title="محادثة المساعد" eyebrow="إجابات معتمدة على البيانات" action={<Badge tone={source === "api" ? "green" : "amber"}>{providerLabel(source)}</Badge>}>
         <div className="flex gap-3">
           <input
             className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
@@ -83,7 +84,7 @@ export function AssistantWorkspace() {
             onClick={ask}
             disabled={loading}
           >
-            Ask
+            اسأل
           </button>
         </div>
 
@@ -93,11 +94,11 @@ export function AssistantWorkspace() {
               <p className="text-sm font-semibold text-slate-950">{message.question}</p>
               <p className="mt-2 text-sm leading-6 text-slate-700">{message.answer}</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Badge tone="blue">{message.provider}</Badge>
+                <Badge tone="blue">{providerLabel(message.provider)}</Badge>
                 <Badge tone={message.confidence_score > 0 ? "green" : "rose"}>
-                  {Math.round(message.confidence_score * 100)}% confidence
+                  ثقة {Math.round(message.confidence_score * 100)}%
                 </Badge>
-                <Badge tone="neutral">{Object.keys(message.data_sources_json).length} source fields</Badge>
+                <Badge tone="neutral">{Object.keys(message.data_sources_json).length} حقول مصدر</Badge>
               </div>
             </div>
           ))}

@@ -11,11 +11,11 @@ export const mobilityPoints = [
 ];
 
 export const routeTypeLabels: Record<string, string> = {
-  fastest: "Fastest",
-  greenest: "Greenest",
-  safest: "Safest",
-  most_walkable: "Most walkable",
-  accessible: "Accessible",
+  fastest: "الأسرع",
+  greenest: "الأكثر خضرة",
+  safest: "الأكثر أمانًا",
+  most_walkable: "الأفضل للمشي",
+  accessible: "الأفضل للوصول",
 };
 
 export const fallbackMobilityComparison: MobilityRouteComparison = {
@@ -35,7 +35,7 @@ export const fallbackMobilityComparison: MobilityRouteComparison = {
       segments: [
         {
           id: "edge-1",
-          name: "Al Mina to El Tal demo road",
+          name: "طريق تجريبي من الميناء إلى التل",
           edge_type: "road",
           from_label: "Al Mina",
           to_label: "El Tal",

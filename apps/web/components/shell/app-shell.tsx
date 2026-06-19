@@ -2,36 +2,118 @@
 
 import { CITY_LABEL, DEMO_DATA_NOTICE, PHASE_FOUR_ROUTES, PROJECT_NAME } from "@citymind/shared";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { Loader } from "@/components/ui/loader";
 import { cn } from "@/lib/cn";
+import type { AuthLoginResponse, CityMindUserRole } from "@/lib/api-client";
+import { AUTH_SESSION_EVENT, clearAuthSession, readStoredAuthSession } from "@/lib/auth-session";
 
 const residentRoutes = PHASE_FOUR_ROUTES.filter((route) => route.phase === "Resident");
 const municipalityRoutes = PHASE_FOUR_ROUTES.filter((route) => route.phase === "Municipality");
-const mobileRoutes = PHASE_FOUR_ROUTES.filter((route) =>
-  ["dashboard", "map", "reports", "mobility", "admin"].includes(route.key),
-);
+
+const OPERATIONS_ROLES: CityMindUserRole[] = [
+  "owner",
+  "municipality_admin",
+  "decision_maker",
+  "analyst",
+  "police",
+  "red_cross",
+  "civil_defense",
+];
 
 const routeIcons: Record<string, string> = {
-  dashboard: "DB",
-  map: "MP",
-  reports: "RP",
-  "green-score": "GS",
-  mobility: "MO",
-  simulator: "SI",
-  predictions: "PR",
-  "ask-city": "AI",
-  admin: "AD",
+  dashboard: "لو",
+  map: "خر",
+  reports: "بل",
+  "green-score": "أخ",
+  mobility: "تن",
+  simulator: "مح",
+  predictions: "تو",
+  "ask-city": "اس",
+  admin: "إد",
 };
+
+function LoadingScreen() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-slate-950">
+      <Loader />
+    </div>
+  );
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [session, setSession] = useState<AuthLoginResponse | null>(null);
+  const [hasLoadedSession, setHasLoadedSession] = useState(false);
+
+  useEffect(() => {
+    function syncSession() {
+      setSession(readStoredAuthSession());
+      setHasLoadedSession(true);
+    }
+
+    syncSession();
+    window.addEventListener(AUTH_SESSION_EVENT, syncSession);
+    window.addEventListener("storage", syncSession);
+
+    return () => {
+      window.removeEventListener(AUTH_SESSION_EVENT, syncSession);
+      window.removeEventListener("storage", syncSession);
+    };
+  }, []);
+
+  const canSeeMunicipality = session ? OPERATIONS_ROLES.includes(session.user.role) : false;
+  const visibleRoutes = useMemo(
+    () => (canSeeMunicipality ? [...residentRoutes, ...municipalityRoutes] : residentRoutes),
+    [canSeeMunicipality],
+  );
+  const mobileRoutes = visibleRoutes.filter((route) =>
+    canSeeMunicipality
+      ? ["dashboard", "map", "reports", "mobility", "admin"].includes(route.key)
+      : ["map", "reports", "green-score", "mobility", "ask-city"].includes(route.key),
+  );
+  const isAuthRoute = pathname === "/login" || pathname === "/register";
+
+  useEffect(() => {
+    if (!hasLoadedSession || session || isAuthRoute) return;
+    router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+  }, [hasLoadedSession, isAuthRoute, pathname, router, session]);
+
+  useEffect(() => {
+    if (!hasLoadedSession || !session || !isAuthRoute) return;
+    router.replace(canSeeMunicipality ? "/admin" : "/");
+  }, [canSeeMunicipality, hasLoadedSession, isAuthRoute, router, session]);
+
+  if (!hasLoadedSession) {
+    return <LoadingScreen />;
+  }
+
+  if (isAuthRoute) {
+    if (session) {
+      return <LoadingScreen />;
+    }
+
+    return <>{children}</>;
+  }
+
+  function signOut() {
+    setSession(null);
+    clearAuthSession();
+    router.push("/login");
+  }
+
+  if (!session) {
+    return <LoadingScreen />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950">
       <div className="grid min-h-screen lg:grid-cols-[280px_1fr]">
-        <aside className="hidden border-r border-slate-200 bg-white lg:block">
+        <aside className="hidden border-l border-slate-200 bg-white lg:block">
           <div className="sticky top-0 flex h-full min-h-screen flex-col">
             <div className="border-b border-slate-200 px-5 py-5">
               <Link href="/dashboard" className="block">
@@ -39,14 +121,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <p className="mt-1 text-sm text-slate-600">{CITY_LABEL}</p>
               </Link>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Badge tone="green">Resident portal</Badge>
-                <Badge tone="blue">Municipality workspace</Badge>
+                <Badge tone="green">بوابة المواطن</Badge>
+                {canSeeMunicipality ? <Badge tone="blue">مساحة العمليات</Badge> : null}
               </div>
             </div>
 
-            <nav className="flex-1 space-y-6 px-3 py-4" aria-label="CityMind modules">
-              <RouteGroup title="For residents" routes={residentRoutes} pathname={pathname} />
-              <RouteGroup title="Municipality" routes={municipalityRoutes} pathname={pathname} />
+            <nav className="flex-1 space-y-6 px-3 py-4" aria-label="وحدات CityMind">
+              <RouteGroup title="للمواطنين" routes={residentRoutes} pathname={pathname} />
+              {canSeeMunicipality ? (
+                <RouteGroup title={session?.user.role === "owner" ? "مساحة رئيس البلدية" : "البلدية"} routes={municipalityRoutes} pathname={pathname} />
+              ) : null}
             </nav>
 
             <div className="border-t border-slate-200 p-4">
@@ -59,15 +143,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase text-emerald-700">CityMind Tripoli</p>
+                <p className="text-xs font-semibold uppercase text-emerald-700">
+                  {canSeeMunicipality ? "وصول الجهات والبلدية" : "وصول المواطن"}
+                </p>
                 <h1 className="mt-1 text-lg font-semibold text-slate-950">
-                  Citizen services and municipal intelligence
+                  {canSeeMunicipality ? "مساحة عمليات طرابلس" : "خدمات مواطني طرابلس"}
                 </h1>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge tone="green">Tripoli focused</Badge>
-                <Badge tone="amber">Demo GIS</Badge>
-                <Badge tone="blue">Mobile ready</Badge>
+              <div className="flex justify-end">
+                <button className="h-9 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700" type="button" onClick={signOut}>
+                  تسجيل الخروج
+                </button>
               </div>
             </div>
           </header>
@@ -78,7 +164,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <nav
         className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white/95 px-2 py-2 shadow-lg backdrop-blur lg:hidden"
-        aria-label="Mobile navigation"
+        aria-label="التنقل على الجوال"
       >
         {mobileRoutes.map((route) => {
           const active = pathname === route.path || pathname.startsWith(`${route.path}/`);

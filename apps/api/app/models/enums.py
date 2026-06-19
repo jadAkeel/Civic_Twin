@@ -1,7 +1,22 @@
-USER_ROLES = ("citizen", "municipality_admin", "decision_maker", "analyst")
+USER_ROLES = (
+    "owner",
+    "citizen",
+    "municipality_admin",
+    "decision_maker",
+    "analyst",
+    "police",
+    "red_cross",
+    "civil_defense",
+)
 
 REPORT_CATEGORIES = (
+    "traffic_congestion",
     "pothole",
+    "waste",
+    "security_incident",
+    "medical_emergency",
+    "fire_hazard",
+    "other",
     "garbage",
     "broken_sidewalk",
     "street_lighting",
@@ -10,7 +25,6 @@ REPORT_CATEGORIES = (
     "accessibility_issue",
     "pollution",
     "public_safety",
-    "other",
 )
 REPORT_SEVERITIES = ("low", "medium", "high", "critical")
 REPORT_STATUSES = ("submitted", "validated", "in_progress", "resolved", "rejected", "duplicate")

@@ -6,10 +6,11 @@ def test_tripoli_seed_data_is_demo_labeled_and_city_specific() -> None:
     data = load_seed_file()
 
     assert data["metadata"]["project"] == "CityMind Tripoli"
-    assert data["metadata"]["city"] == "Tripoli"
-    assert data["metadata"]["country"] == "Lebanon"
+    assert data["metadata"]["city"] == "\u0637\u0631\u0627\u0628\u0644\u0633"
+    assert data["metadata"]["country"] == "\u0644\u0628\u0646\u0627\u0646"
     assert data["metadata"]["demo_data"] is True
-    assert "not official municipal GIS data" in data["metadata"]["data_notice"]
+    assert "GIS" in data["metadata"]["data_notice"]
+    assert "\u0644\u064a\u0633\u062a" in data["metadata"]["data_notice"]
 
 
 def test_tripoli_seed_data_contains_required_neighborhoods() -> None:

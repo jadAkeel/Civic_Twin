@@ -15,7 +15,7 @@ def test_scenario_engine_combines_required_outputs() -> None:
     assert result["implementation_time_days"] == 80
     assert result["risk_level"] == "medium"
     assert 0 < result["confidence_score"] <= 1
-    assert "sanitation" in result["recommendation"].lower()
+    assert "\u0627\u0644\u0646\u0638\u0627\u0641\u0629" in result["recommendation"]
 
 
 def test_scenario_simulation_endpoint_persists_result() -> None:

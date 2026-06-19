@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from app.core.seed import load_seed
 from app.modules.walkability.calculator import WALKABILITY_WEIGHTS, calculate_walkability_score
 
 router = APIRouter(prefix="/walkability", tags=["walkability"])
 
-SEED_PATH = Path(__file__).resolve().parents[5] / "data" / "tripoli_seed.json"
-
 
 def _load_seed() -> dict[str, Any]:
-    return json.loads(SEED_PATH.read_text(encoding="utf-8"))
+    return load_seed()
 
 
 def _score_rows() -> list[dict[str, Any]]:

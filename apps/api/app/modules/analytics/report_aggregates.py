@@ -90,7 +90,7 @@ def build_report_aggregates(reports: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _priority_reason(stats: dict[str, Any]) -> str:
     if stats["critical_reports"]:
-        return "Critical reports and unresolved citizen tickets are concentrated here."
+        return "تتركز هنا بلاغات حرجة وبلاغات مواطنين غير محلولة."
     if stats["open_reports"] >= 3:
-        return "Open municipal workload is above the Tripoli demo baseline."
-    return "Recurring reports keep this area on the operating watchlist."
+        return "عبء العمل البلدي المفتوح أعلى من خط الأساس التجريبي في طرابلس."
+    return "تكرار البلاغات يبقي هذه المنطقة على قائمة المتابعة التشغيلية."

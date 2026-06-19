@@ -5,10 +5,10 @@ export default function AdminPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Municipality Admin Panel"
-        title="Tripoli municipal operations"
-        description="Role-ready local auth, report status operations, city asset management, and review counts."
-        status="Municipality"
+        eyebrow="لوحة الوصول التشغيلي"
+        title="عمليات بلدية طرابلس"
+        description="بوابات تجريبية محلية لرئيس البلدية والبلدية والشرطة والصليب الأحمر والدفاع المدني، مع قوائم بلاغات مفلترة حسب الصلاحية."
+        status="تراعي صلاحيات الجهات"
       />
 
       <AdminWorkspace />

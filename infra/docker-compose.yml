@@ -17,7 +17,8 @@ services:
 
   api:
     build:
-      context: ../apps/api
+      context: ..
+      dockerfile: apps/api/Dockerfile
     environment:
       PROJECT_NAME: ${PROJECT_NAME:-CityMind Tripoli}
       CITY_NAME: ${CITY_NAME:-Tripoli}
@@ -25,7 +26,7 @@ services:
       APP_ENV: ${APP_ENV:-local}
       DATABASE_URL: postgresql+psycopg://citymind:citymind@db:5432/citymind
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "${API_PORT:-8100}:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -35,9 +36,9 @@ services:
       context: ..
       dockerfile: apps/web/Dockerfile
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:${API_PORT:-8000}
+      NEXT_PUBLIC_API_URL: http://localhost:${API_PORT:-8100}
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - "${WEB_PORT:-3100}:3000"
     depends_on:
       - api
 
@@ -61,4 +62,3 @@ services:
 volumes:
   citymind_postgres_data:
   citymind_minio_data:
-

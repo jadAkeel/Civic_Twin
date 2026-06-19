@@ -1,10 +1,13 @@
-.PHONY: install dev lint typecheck api-test web-smoke validate docker-config docker-up docker-down
+.PHONY: install dev dev-local lint typecheck api-test web-smoke validate docker-config docker-up docker-down
 
 install:
 	pnpm install
 
 dev:
 	pnpm dev
+
+dev-local:
+	pnpm dev:local
 
 lint:
 	pnpm lint

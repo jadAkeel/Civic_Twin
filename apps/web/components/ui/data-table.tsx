@@ -16,7 +16,7 @@ export function DataTable<T>({
   return (
     <div className="min-w-0 overflow-hidden rounded-md border border-slate-200">
       <div className="min-w-0 overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+        <table className="min-w-full divide-y divide-slate-200 text-right text-sm">
           <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
             <tr>
               {columns.map((column) => (

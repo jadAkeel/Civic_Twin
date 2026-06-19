@@ -5,10 +5,10 @@ export default function SimulatorPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Urban Scenario Simulator"
-        title="Tripoli before and after simulator"
-        description="Rule-based intervention simulation for trees, bike lanes, parks, bus stops, sidewalks, lighting, waste collection, and traffic flow."
-        status="Municipality"
+        eyebrow="محاكي السيناريوهات الحضرية"
+        title="محاكاة قبل وبعد في طرابلس"
+        description="محاكاة تدخلات مبنية على قواعد للأشجار ومسارات الدراجات والحدائق ومواقف الحافلات والأرصفة والإنارة وجمع النفايات وتدفق المرور."
+        status="البلدية"
       />
 
       <ScenarioWorkspace />

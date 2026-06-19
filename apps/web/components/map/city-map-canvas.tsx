@@ -64,6 +64,8 @@ type CityMapCanvasProps = {
   onMapPick?: (point: DraftPoint) => void;
   draftPoint?: DraftPoint | null;
   compact?: boolean;
+  focusSelected?: boolean;
+  showStatusBadges?: boolean;
   className?: string;
   heightClassName?: string;
 };
@@ -108,19 +110,29 @@ function assetClass(status: TripoliAssetMarker["status"]) {
   return "bg-teal-700 text-white";
 }
 
+function issueMarkerLabel(category: string) {
+  if (category === "garbage" || category === "waste") return "W";
+  if (category === "street_lighting") return "L";
+  if (category === "pollution" || category === "fire_hazard") return "P";
+  if (category === "traffic_congestion" || category === "traffic_obstruction") return "T";
+  if (category === "pothole" || category === "broken_sidewalk" || category === "water_leakage") return "R";
+  if (category === "medical_emergency") return "+";
+  return "!";
+}
+
 function issueBelongsToLayer(issue: TripoliIssueMarker, layers: Record<TripoliMapLayerId, boolean>) {
   if (layers.reports) return true;
-  if (layers.waste && issue.category === "garbage") return true;
+  if (layers.waste && ["garbage", "waste"].includes(issue.category)) return true;
   if (
     layers.roads &&
-    ["pothole", "traffic_obstruction", "broken_sidewalk", "accessibility_issue", "water_leakage"].includes(
+    ["pothole", "traffic_congestion", "traffic_obstruction", "broken_sidewalk", "accessibility_issue", "water_leakage"].includes(
       issue.category,
     )
   ) {
     return true;
   }
-  if (layers.lighting && ["street_lighting", "public_safety"].includes(issue.category)) return true;
-  if (layers.pollution && ["pollution", "public_safety"].includes(issue.category)) return true;
+  if (layers.lighting && ["street_lighting", "public_safety", "security_incident"].includes(issue.category)) return true;
+  if (layers.pollution && ["pollution", "public_safety", "security_incident"].includes(issue.category)) return true;
   return false;
 }
 
@@ -221,6 +233,8 @@ export function CityMapCanvas({
   onMapPick,
   draftPoint,
   compact = false,
+  focusSelected = false,
+  showStatusBadges = true,
   className,
   heightClassName,
 }: CityMapCanvasProps) {
@@ -272,8 +286,8 @@ export function CityMapCanvas({
         attributionControl: false,
       });
 
-      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-      map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
+      map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
 
       map.on("load", () => {
         map.addSource("citymind-neighborhoods", { type: "geojson", data: emptyCollection });
@@ -376,13 +390,7 @@ export function CityMapCanvas({
 
     issueMarkersRef.current = visibleIssues.map((issue) => {
       const element = markerElement(
-        issue.category === "garbage"
-          ? "W"
-          : issue.category === "street_lighting"
-            ? "L"
-            : issue.category === "pollution"
-              ? "P"
-              : "!",
+        issueMarkerLabel(issue.category),
         severityClass(issue.severity),
         selected?.type === "issue" && selected.item.id === issue.id,
       );
@@ -461,24 +469,35 @@ export function CityMapCanvas({
         ? { latitude: selected.item.latitude, longitude: selected.item.longitude }
         : null;
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!focusSelected || !map || mapState !== "ready" || !selectedCoordinates) return;
+
+    map.flyTo({
+      center: [selectedCoordinates.longitude, selectedCoordinates.latitude],
+      zoom: Math.max(map.getZoom(), compact ? 14.2 : 14),
+      essential: true,
+    });
+  }, [compact, focusSelected, mapState, selectedCoordinates?.latitude, selectedCoordinates?.longitude]);
+
   return (
     <div className={cn("overflow-hidden rounded-md border border-slate-200 bg-white", className)}>
       <div className={cn("relative min-h-[520px] bg-slate-100", heightClassName, compact && "min-h-[360px]")}>
-        <div ref={mapContainerRef} className="absolute inset-0" aria-label="Interactive Tripoli map" />
+        <div ref={mapContainerRef} className="absolute inset-0" aria-label="خريطة طرابلس التفاعلية" />
 
-        <div className="pointer-events-none absolute left-3 right-3 top-3 flex flex-wrap gap-2">
+        <div className={cn("pointer-events-none absolute left-3 right-3 top-3 flex flex-wrap gap-2", !showStatusBadges && "hidden")}>
           <Badge tone={mapState === "ready" ? "green" : mapState === "error" ? "rose" : "blue"}>
-            {mapState === "ready" ? "Map live" : mapState === "error" ? "Map unavailable" : "Loading map"}
+            {mapState === "ready" ? "الخريطة مباشرة" : mapState === "error" ? "الخريطة غير متاحة" : "جارٍ تحميل الخريطة"}
           </Badge>
-          <Badge tone="amber">Demo GIS boundaries</Badge>
+          <Badge tone="amber">حدود GIS تجريبية</Badge>
         </div>
 
-        <div className="absolute bottom-3 left-3 flex gap-2">
+        <div className="absolute bottom-3 right-3 flex gap-2">
           <button className="rounded-md bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm" type="button" onClick={resetView}>
-            Reset
+            إعادة الضبط
           </button>
           <button className="rounded-md bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm" type="button" onClick={locateResident}>
-            Locate
+            تحديد موقعي
           </button>
         </div>
 
@@ -486,10 +505,10 @@ export function CityMapCanvas({
           <div className="absolute inset-0 grid place-items-center bg-slate-100/90 px-6 text-center">
             <div>
               <p className="text-sm font-semibold text-slate-950">
-                {mapState === "error" ? "Tripoli map could not load" : "Loading Tripoli map"}
+                {mapState === "error" ? "تعذر تحميل خريطة طرابلس" : "جارٍ تحميل خريطة طرابلس"}
               </p>
               <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
-                The temporary map uses OpenStreetMap tiles and local Tripoli demo layers.
+                تستخدم الخريطة المؤقتة مربعات OpenStreetMap وطبقات طرابلس التجريبية المحلية.
               </p>
             </div>
           </div>
@@ -503,7 +522,7 @@ export function CityMapCanvas({
               <div key={layer.id} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
                 <p className="text-xs font-semibold uppercase text-slate-500">{layer.label}</p>
                 <p className="mt-1 text-sm font-semibold text-slate-950">
-                  {layers[layer.id] ? "Visible" : "Hidden"}
+                  {layers[layer.id] ? "ظاهرة" : "مخفية"}
                 </p>
               </div>
             ))}
@@ -511,7 +530,7 @@ export function CityMapCanvas({
 
           <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
             <p className="text-xs font-semibold uppercase text-slate-500">
-              {selected ? "Selected place" : "Tripoli image context"}
+              {selected ? "المكان المحدد" : "سياق صورة طرابلس"}
             </p>
             <p className="mt-1 text-sm font-semibold text-slate-950">
               {selected?.type === "issue" || selected?.type === "asset"
@@ -539,7 +558,7 @@ export function CityMapCanvas({
                 target="_blank"
                 rel="noreferrer"
               >
-                Open in Google Maps
+                فتح في خرائط Google
               </a>
             ) : null}
           </div>

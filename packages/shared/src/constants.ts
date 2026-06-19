@@ -1,11 +1,11 @@
 import type { CityMindRoute, TripoliNeighborhoodName } from "./types";
 
 export const PROJECT_NAME = "CityMind Tripoli";
-export const CITY_NAME = "Tripoli";
-export const COUNTRY_NAME = "Lebanon";
-export const CITY_LABEL = "Tripoli, Lebanon";
+export const CITY_NAME = "طرابلس";
+export const COUNTRY_NAME = "لبنان";
+export const CITY_LABEL = "طرابلس، لبنان";
 export const DEMO_DATA_NOTICE =
-  "Tripoli demo data is shown until official municipal GIS and service feeds are connected.";
+  "تظهر بيانات تجريبية عن طرابلس إلى حين ربط نظم GIS البلدية الرسمية ومصادر الخدمات.";
 
 export const CITY_CENTER = {
   latitude: 34.4367,
@@ -25,16 +25,16 @@ export const TRIPOLI_NEIGHBORHOODS: TripoliNeighborhoodName[] = [
 ];
 
 export const CITYMIND_MODULES = [
-  "Smart Reporter",
-  "Tripoli Interactive Map",
-  "City Pulse Dashboard",
-  "Green Score Engine",
-  "Walkability Score",
-  "Smart Mobility",
-  "City Guardian Prediction Engine",
-  "Urban Scenario Simulator",
-  "Ask Your City AI Assistant",
-  "Municipality Admin Panel",
+  "الإبلاغ الذكي",
+  "خريطة طرابلس التفاعلية",
+  "لوحة نبض المدينة",
+  "محرك المؤشر الأخضر",
+  "مؤشر قابلية المشي",
+  "التنقل الذكي",
+  "محرك توقعات حارس المدينة",
+  "محاكي السيناريوهات الحضرية",
+  "مساعد اسأل مدينتك",
+  "لوحة إدارة البلدية",
 ] as const;
 
 export const PHASE_ONE_MODULES = CITYMIND_MODULES;
@@ -42,83 +42,83 @@ export const PHASE_ONE_MODULES = CITYMIND_MODULES;
 export const PHASE_FOUR_ROUTES = [
   {
     key: "dashboard",
-    label: "Dashboard",
+    label: "لوحة المدينة",
     path: "/dashboard",
-    module: "City Pulse Dashboard",
+    module: "لوحة نبض المدينة",
     phase: "Municipality",
     status: "active",
-    summary: "Tripoli city operating view with KPIs, panels, tables, and demo signals.",
+    summary: "عرض تشغيلي لطرابلس مع مؤشرات ولوحات وجداول وإشارات تجريبية.",
   },
   {
     key: "map",
-    label: "City Map",
+    label: "الخريطة",
     path: "/map",
-    module: "Tripoli Interactive Map",
+    module: "خريطة طرابلس التفاعلية",
     phase: "Resident",
     status: "active",
-    summary: "Interactive Tripoli map with reports, assets, neighborhoods, and planning layers.",
+    summary: "خريطة تفاعلية لطرابلس تعرض البلاغات والأصول والأحياء وطبقات التخطيط.",
   },
   {
     key: "reports",
-    label: "Report Issue",
+    label: "بلاغ جديد",
     path: "/reports",
-    module: "Smart Reporter",
+    module: "الإبلاغ الذكي",
     phase: "Resident",
     status: "active",
-    summary: "Citizen issue reporting workspace with status, severity, and map location tools.",
+    summary: "مساحة بلاغات للمواطنين مع الحالة والخطورة وأدوات تحديد الموقع.",
   },
   {
     key: "green-score",
-    label: "Green Score",
+    label: "المؤشر الأخضر",
     path: "/green-score",
-    module: "Green Score and Walkability",
+    module: "المؤشر الأخضر وقابلية المشي",
     phase: "Resident",
     status: "active",
-    summary: "Neighborhood sustainability and explainability workspace for Tripoli.",
+    summary: "مساحة تشرح مؤشرات الاستدامة وقابلية المشي لأحياء طرابلس.",
   },
   {
     key: "mobility",
-    label: "Mobility",
+    label: "التنقل",
     path: "/mobility",
-    module: "Smart Mobility",
+    module: "التنقل الذكي",
     phase: "Resident",
     status: "active",
-    summary: "Route option shell for fastest, greenest, safest, accessible, and walkable trips.",
+    summary: "واجهة جاهزية لمسارات أسرع وأكثر خضرة وأمانًا وقابلية للوصول والمشي.",
   },
   {
     key: "simulator",
-    label: "Simulator",
+    label: "المحاكاة",
     path: "/simulator",
-    module: "Urban Scenario Simulator",
+    module: "محاكي السيناريوهات الحضرية",
     phase: "Municipality",
     status: "active",
-    summary: "Before and after planning workspace for Tripoli intervention scenarios.",
+    summary: "مساحة مقارنة قبل/بعد لتخطيط تدخلات حضرية في طرابلس.",
   },
   {
     key: "predictions",
-    label: "Predictions",
+    label: "التوقعات",
     path: "/predictions",
-    module: "City Guardian Prediction Engine",
+    module: "محرك توقعات حارس المدينة",
     phase: "Municipality",
     status: "active",
-    summary: "Risk signal shell for congestion, waste, heat, infrastructure, and service pressure.",
+    summary: "إشارات مخاطر للازدحام والنفايات والحرارة والبنية التحتية وضغط الخدمات.",
   },
   {
     key: "ask-city",
-    label: "Ask City",
+    label: "اسأل المدينة",
     path: "/ask-city",
-    module: "Ask Your City AI Assistant",
+    module: "مساعد اسأل مدينتك",
     phase: "Resident",
     status: "active",
-    summary: "Grounded assistant surface for asking questions about CityMind Tripoli data.",
+    summary: "مساعد يعتمد على بيانات CityMind Tripoli للإجابة عن أسئلة المدينة.",
   },
   {
     key: "admin",
-    label: "Admin",
+    label: "الإدارة",
     path: "/admin",
-    module: "Municipality Admin Panel",
+    module: "لوحة إدارة البلدية",
     phase: "Municipality",
     status: "active",
-    summary: "Municipal operations shell for reports, assets, scenarios, and interventions.",
+    summary: "مساحة تشغيل بلدية للبلاغات والأصول والسيناريوهات والتدخلات.",
   },
 ] satisfies CityMindRoute[];

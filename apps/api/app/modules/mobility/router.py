@@ -2,21 +2,20 @@ from __future__ import annotations
 
 import heapq
 from itertools import count
-import json
-from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.core.seed import load_seed
+
 router = APIRouter(prefix="/mobility", tags=["mobility"])
 
-SEED_PATH = Path(__file__).resolve().parents[5] / "data" / "tripoli_seed.json"
 RouteType = Literal["fastest", "greenest", "safest", "most_walkable", "accessible"]
 ROUTE_TYPES: tuple[RouteType, ...] = ("fastest", "greenest", "safest", "most_walkable", "accessible")
 
 
 def _load_edges() -> list[dict[str, Any]]:
-    seed = json.loads(SEED_PATH.read_text(encoding="utf-8"))
+    seed = load_seed()
     return [
         {
             "id": f"edge-{index}",

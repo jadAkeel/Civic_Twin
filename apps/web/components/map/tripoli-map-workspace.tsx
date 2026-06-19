@@ -108,33 +108,33 @@ export function TripoliMapWorkspace() {
         />
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <MapStat label="Visible reports" value={filteredIssues.length} />
-          <MapStat label="City assets" value={filteredAssets.length} />
-          <MapStat label="Neighborhoods" value={filteredNeighborhoods.length} />
-          <MapStat label="Route overlays" value={visibleRouteCount} />
+          <MapStat label="البلاغات الظاهرة" value={filteredIssues.length} />
+          <MapStat label="أصول المدينة" value={filteredAssets.length} />
+          <MapStat label="الأحياء" value={filteredNeighborhoods.length} />
+          <MapStat label="طبقات المسارات" value={visibleRouteCount} />
         </section>
       </div>
 
       <div className="grid gap-6">
-        <Panel title="Find a place or issue" eyebrow="Tripoli layers">
+        <Panel title="ابحث عن مكان أو مشكلة" eyebrow="طبقات طرابلس">
           <div className="grid gap-4">
             <label className="grid gap-1.5 text-sm">
-              <span className="font-medium text-slate-700">Search</span>
+              <span className="font-medium text-slate-700">بحث</span>
               <input
                 className="h-10 rounded-md border border-slate-300 px-3 text-sm"
-                placeholder="Try Qoubbeh, garbage, lighting..."
+                placeholder="جرّب القبة، نفايات، إنارة..."
                 value={filters.search}
                 onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
               />
             </label>
             <SelectControl
-              label="Category"
+              label="الفئة"
               value={filters.category}
               options={["all", ...tripoliMapFilterOptions.categories]}
               onChange={(value) => setFilters((current) => ({ ...current, category: value }))}
             />
             <SelectControl
-              label="Severity"
+              label="الخطورة"
               value={filters.severity}
               options={["all", ...tripoliMapFilterOptions.severities]}
               onChange={(value) =>
@@ -142,7 +142,7 @@ export function TripoliMapWorkspace() {
               }
             />
             <SelectControl
-              label="Status"
+              label="الحالة"
               value={filters.status}
               options={["all", ...tripoliMapFilterOptions.statuses]}
               onChange={(value) =>
@@ -150,7 +150,7 @@ export function TripoliMapWorkspace() {
               }
             />
             <SelectControl
-              label="Neighborhood"
+              label="الحي"
               value={filters.neighborhood}
               options={["all", ...tripoliMapFilterOptions.neighborhoods]}
               onChange={(value) => setFilters((current) => ({ ...current, neighborhood: value }))}
@@ -158,7 +158,7 @@ export function TripoliMapWorkspace() {
           </div>
         </Panel>
 
-        <Panel title="Layer controls" eyebrow="Choose what the city sees">
+        <Panel title="التحكم بالطبقات" eyebrow="اختر ما يظهر على الخريطة">
           <div className="grid gap-3">
             {tripoliMapLayers.map((layer) => (
               <label
@@ -185,7 +185,7 @@ export function TripoliMapWorkspace() {
           </div>
         </Panel>
 
-        <Panel title="Selected details" eyebrow="Map inspector">
+        <Panel title="تفاصيل العنصر المحدد" eyebrow="فاحص الخريطة">
           <SelectedDetails selected={selected} />
         </Panel>
       </div>
@@ -223,7 +223,7 @@ function SelectControl({
       >
         {options.map((option) => (
           <option key={option} value={option}>
-            {option === "all" ? "All" : formatMapLabel(option)}
+            {option === "all" ? "الكل" : formatMapLabel(option)}
           </option>
         ))}
       </select>
@@ -233,7 +233,7 @@ function SelectControl({
 
 function SelectedDetails({ selected }: { selected: CityMapSelection | null }) {
   if (!selected) {
-    return <p className="text-sm leading-6 text-slate-600">Select a marker, route, or neighborhood on the map.</p>;
+    return <p className="text-sm leading-6 text-slate-600">اختر علامة أو مسارًا أو حيًا على الخريطة.</p>;
   }
 
   if (selected.type === "issue") {
@@ -264,7 +264,7 @@ function SelectedDetails({ selected }: { selected: CityMapSelection | null }) {
         </Badge>
         <h3 className="text-base font-semibold text-slate-950">{selected.item.name}</h3>
         <p className="text-sm leading-6 text-slate-600">
-          {formatMapLabel(selected.item.assetType)} in {selected.item.neighborhood}.
+          {formatMapLabel(selected.item.assetType)} في {selected.item.neighborhood}.
         </p>
       </div>
     );

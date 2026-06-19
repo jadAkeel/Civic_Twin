@@ -63,6 +63,6 @@ def test_walkability_endpoint_returns_tripoli_neighborhood_breakdowns() -> None:
 
     assert response.status_code == 200
     row = response.json()
-    assert row["neighborhood"] == "Old Souks"
+    assert row["neighborhood"] == "\u0627\u0644\u0623\u0633\u0648\u0627\u0642 \u0627\u0644\u0642\u062f\u064a\u0645\u0629"
     assert row["walkability_score"] > 60
     assert len(row["walkability_breakdown"]) == 6

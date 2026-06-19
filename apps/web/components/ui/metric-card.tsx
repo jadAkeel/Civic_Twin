@@ -25,7 +25,7 @@ export function MetricCard({
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-slate-600">{label}</p>
         <span className={cn("rounded-full border px-2 py-0.5 text-xs font-semibold", toneClasses[tone])}>
-          Demo
+          تجريبي
         </span>
       </div>
       <p className="mt-4 text-3xl font-semibold text-slate-950">{value}</p>
