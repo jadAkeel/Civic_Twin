@@ -1,0 +1,364 @@
+"use client";
+
+import { useState } from "react";
+
+import { CityMapCanvas } from "@/components/map/city-map-canvas";
+import { Badge } from "@/components/ui/badge";
+import { CityIcon, type CityIconName } from "@/components/ui/city-icon";
+import { DataTable } from "@/components/ui/data-table";
+import { MetricCard } from "@/components/ui/metric-card";
+import { Panel } from "@/components/ui/panel";
+import { tripoliRouteOverlays } from "@/features/map/tripoli-map-data";
+import {
+  actionLabel,
+  fallbackScenarioResult,
+  scenarioActions,
+  scenarioNeighborhoods,
+} from "@/features/scenarios/scenario-data";
+import { citymindApi, type ScenarioResult } from "@/lib/api-client";
+import { readStoredAuthSession } from "@/lib/auth-session";
+import { providerLabel, severityLabel } from "@/lib/display-labels";
+
+function riskTone(risk: ScenarioResult["risk_level"]) {
+  if (risk === "high" || risk === "critical") return "rose";
+  if (risk === "medium") return "amber";
+  return "green";
+}
+
+function recommendationLabel(recommendation: string) {
+  if (recommendation.includes("Prioritize sanitation operations")) {
+    return "أعطِ الأولوية لعمليات النظافة مع مراقبة على مستوى الحي.";
+  }
+  if (recommendation.includes("Run a small Tripoli pilot")) {
+    return "نفّذ تجربة صغيرة في طرابلس قبل اعتمادها على نطاق المدينة.";
+  }
+  return recommendation;
+}
+
+function warningLabel(warning: string) {
+  const labels: Record<string, string> = {
+    "Baseline data is demo or assumption-backed and must be replaced before an official decision.":
+      "بيانات خط الأساس تجريبية أو مبنية على افتراضات ويجب استبدالها قبل أي قرار رسمي.",
+    "Baseline data is demo-backed and must be replaced before an official decision.":
+      "بيانات خط الأساس تجريبية ويجب استبدالها قبل أي قرار رسمي.",
+    "The estimated cost exceeds the supplied budget limit.": "الكلفة التقديرية تتجاوز سقف الميزانية المحدد.",
+    "Combined actions include modeled interactions; review their assumptions before approval.":
+      "الإجراءات المدمجة تتضمن تفاعلات نموذجية؛ راجع افتراضاتها قبل الاعتماد.",
+    "Limited open-report evidence is available for this neighborhood.":
+      "الأدلة المتاحة من البلاغات المفتوحة في هذا الحي محدودة.",
+  };
+  return labels[warning] ?? warning;
+}
+
+function actionIcon(action: string): CityIconName {
+  const icons: Record<string, CityIconName> = {
+    ADD_TREES: "green-score",
+    ADD_BIKE_LANE: "mobility",
+    ADD_PARK: "map",
+    ADD_BUS_STOP: "mobility",
+    IMPROVE_WASTE_COLLECTION: "waste",
+    PEDESTRIANIZE_STREET: "walk",
+    CHANGE_TRAFFIC_FLOW: "trend",
+    IMPROVE_SIDEWALKS: "walk",
+    IMPROVE_LIGHTING: "building",
+  };
+  return icons[action] ?? "simulator";
+}
+
+function signedValue(value: number) {
+  return `${value > 0 ? "+" : ""}${value}`;
+}
+
+export function ScenarioWorkspace() {
+  const [name, setName] = useState("تجربة نفايات وأشجار في باب التبانة");
+  const [neighborhoodSlug, setNeighborhoodSlug] = useState("bab-al-tebbaneh");
+  const [selectedActions, setSelectedActions] = useState<string[]>(["ADD_TREES", "IMPROVE_WASTE_COLLECTION"]);
+  const [results, setResults] = useState<ScenarioResult[]>([fallbackScenarioResult]);
+  const [source, setSource] = useState<"api" | "fallback">("fallback");
+  const [intensity, setIntensity] = useState<ScenarioResult["intensity"]>("standard");
+  const [executionMode, setExecutionMode] = useState<ScenarioResult["execution_mode"]>("sequential");
+  const [budgetLimit, setBudgetLimit] = useState("100000");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
+
+  function toggleAction(action: string) {
+    setSelectedActions((current) => {
+      if (current.includes(action)) return current.filter((item) => item !== action);
+      if (current.length >= 5) {
+        setErrorMessage("يمكن مقارنة خمسة إجراءات كحد أقصى في السيناريو الواحد.");
+        return current;
+      }
+      setErrorMessage(null);
+      return [...current, action];
+    });
+  }
+
+  async function simulate() {
+    if (!selectedActions.length || isSimulating) return;
+    const session = readStoredAuthSession();
+    if (!session) {
+      setErrorMessage("يجب تسجيل الدخول بصلاحية بلدية لتشغيل المحاكاة.");
+      return;
+    }
+    const parsedBudget = budgetLimit.trim() ? Number(budgetLimit) : null;
+    if (parsedBudget !== null && (!Number.isFinite(parsedBudget) || parsedBudget < 1000)) {
+      setErrorMessage("الميزانية يجب أن تكون رقماً لا يقل عن 1,000 دولار، أو اتركها فارغة.");
+      return;
+    }
+
+    setIsSimulating(true);
+    setErrorMessage(null);
+    try {
+      const result = await citymindApi.scenarios.simulate(session.access_token, {
+        name,
+        neighborhood_slug: neighborhoodSlug,
+        actions: selectedActions,
+        intensity,
+        execution_mode: executionMode,
+        budget_limit: parsedBudget,
+      });
+      setResults((current) => [result, ...current]);
+      setSource("api");
+    } catch {
+      setSource("fallback");
+      setErrorMessage("تعذّر الوصول إلى خدمة المحاكاة؛ لم يتم إنشاء أو حفظ نتيجة جديدة.");
+    } finally {
+      setIsSimulating(false);
+    }
+  }
+
+  const latest = results[0];
+  const availableActions = scenarioActions.filter((action) => !selectedActions.includes(action));
+  const impacts: Array<{ label: string; value: number; icon: CityIconName; tone: string }> = [
+    { label: "المؤشر الأخضر", value: latest.green_score_delta, icon: "green-score", tone: "text-teal-700" },
+    { label: "جودة الهواء", value: latest.air_quality_delta, icon: "trend", tone: "text-sky-700" },
+    { label: "قابلية المشي", value: latest.walkability_delta, icon: "walk", tone: "text-teal-700" },
+    { label: "المرور", value: latest.traffic_delta, icon: "mobility", tone: "text-slate-600" },
+    { label: "التلوث", value: latest.pollution_delta, icon: "warning", tone: "text-orange-700" },
+    { label: "الحرارة", value: latest.temperature_delta, icon: "trend", tone: "text-orange-700" },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <section
+        className="grid divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,35,55,0.04)] md:grid-cols-2 md:divide-x md:divide-x-reverse md:divide-y-0 md:divide-slate-200 xl:grid-cols-4"
+        aria-label="ملخص نتيجة المحاكاة"
+      >
+        <MetricCard detail="مقارنة مع خط الأساس" icon="green-score" integrated label="تغير المؤشر الأخضر" tone="green" value={signedValue(latest.green_score_delta)} />
+        <MetricCard detail="تقدير راحة المشاة" icon="walk" integrated label="تغير قابلية المشي" tone="blue" value={signedValue(latest.walkability_delta)} />
+        <MetricCard detail="تقدير رأسمالي مبني على قواعد" icon="dollar" integrated label="الكلفة التقديرية" tone="green" value={`$${Math.round(latest.estimated_cost / 1000)} ألف`} />
+        <MetricCard detail={`ثقة ${Math.round(latest.confidence_score * 100)}%`} icon="warning" integrated label="الخطر" tone="rose" value={severityLabel(latest.risk_level)} />
+      </section>
+
+      <div className="grid items-start gap-5 [direction:ltr] xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)]">
+        <Panel
+          action={<Badge tone={riskTone(latest.risk_level)}>الخطر: {severityLabel(latest.risk_level)}</Badge>}
+          bodyClassName="p-0"
+          className="[direction:rtl]"
+          eyebrow={latest.scenario_name}
+          title="أثر تقديري"
+        >
+          <div className="grid divide-y divide-slate-200 bg-slate-50/70 px-4 py-1 sm:grid-cols-3 sm:divide-x sm:divide-x-reverse sm:divide-y-0">
+            <div className="py-1 sm:px-4 sm:first:pr-0">
+              <p className="text-[11px] font-bold text-slate-500">خط الأساس</p>
+              <p className="mt-1 text-sm font-bold text-slate-900">{latest.baseline.neighborhood_name}</p>
+              <p className="text-xs text-slate-500">قياس {latest.baseline.measurement_date}</p>
+            </div>
+            <div className="py-1 sm:px-4">
+              <p className="text-[11px] font-bold text-slate-500">قبل ← بعد</p>
+              <p className="mt-1 text-sm text-slate-800">أخضر {latest.baseline.overall_green_score} ← {latest.projected_scores.overall_green_score}</p>
+              <p className="text-xs text-slate-500">مشي {latest.baseline.walkability_score} ← {latest.projected_scores.walkability_score}</p>
+            </div>
+            <div className="py-1 sm:px-4">
+              <p className="text-[11px] font-bold text-slate-500">المنهجية</p>
+              <p className="mt-1 text-sm font-bold text-slate-900">{latest.methodology.version}</p>
+              <p className="text-xs text-slate-500">جودة البيانات {Math.round(latest.methodology.data_quality_score * 100)}%</p>
+            </div>
+          </div>
+
+          <CityMapCanvas
+            compact
+            heightClassName="min-h-[260px] lg:min-h-[230px]"
+            activeLayers={{
+              neighborhoods: true,
+              reports: false,
+              waste: selectedActions.includes("IMPROVE_WASTE_COLLECTION"),
+              roads: selectedActions.includes("IMPROVE_SIDEWALKS") || selectedActions.includes("CHANGE_TRAFFIC_FLOW"),
+              lighting: selectedActions.includes("IMPROVE_LIGHTING"),
+              pollution: false,
+              greenRoutes:
+                selectedActions.includes("ADD_TREES") ||
+                selectedActions.includes("ADD_BIKE_LANE") ||
+                selectedActions.includes("ADD_PARK"),
+              traffic: selectedActions.includes("CHANGE_TRAFFIC_FLOW"),
+              assets: true,
+            }}
+            routes={tripoliRouteOverlays.filter((route) =>
+              selectedActions.includes("CHANGE_TRAFFIC_FLOW") ? route.kind !== "green" : route.kind !== "traffic",
+            )}
+          />
+
+          <div className="divide-y divide-slate-100 border-y border-slate-200">
+            {impacts.map((impact) => (
+              <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-5 py-1.5" key={impact.label}>
+                <CityIcon className="h-[18px] w-[18px] text-slate-500" name={impact.icon} />
+                <span className="text-sm font-semibold text-slate-800">{impact.label}</span>
+                <span className={`text-base font-bold tabular-nums ${impact.tone}`}>{signedValue(impact.value)}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-1.5 p-2">
+            <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-950">
+              <span className="font-bold text-slate-900">التوصية: </span>{recommendationLabel(latest.recommendation)}
+              <span className="mx-2 text-sky-300">•</span>
+              <span className="font-bold">عدم اليقين: </span>
+              المؤشر الأخضر من {latest.uncertainty.green_score_delta.low} إلى {latest.uncertainty.green_score_delta.high}، والكلفة من ${Math.round(latest.uncertainty.estimated_cost.low).toLocaleString()} إلى ${Math.round(latest.uncertainty.estimated_cost.high).toLocaleString()}.
+            </p>
+            {latest.warnings.length ? (
+              <div className="flex gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs leading-5 text-orange-950">
+                <CityIcon className="mt-0.5 h-4 w-4 shrink-0" name="warning" />
+                <div><span className="font-bold">قبل الاعتماد: </span>
+                <ul className="inline">
+                  {latest.warnings.map((warning) => <li key={warning}>{warningLabel(warning)}</li>)}
+                </ul></div>
+              </div>
+            ) : null}
+          </div>
+        </Panel>
+
+        <Panel
+          bodyClassName="p-5"
+          className="[direction:rtl] xl:sticky xl:top-24"
+          eyebrow={source === "api" ? "خدمة CityMind متصلة" : providerLabel(source)}
+          title="باني السيناريو"
+        >
+          <div className="space-y-4">
+            <label className="block text-sm font-semibold text-slate-700">
+              اسم السيناريو
+              <input className="city-control mt-1.5" value={name} onChange={(event) => setName(event.target.value)} />
+            </label>
+
+            <label className="block text-sm font-semibold text-slate-700">
+              الحي
+              <select className="city-control mt-1.5" value={neighborhoodSlug} onChange={(event) => setNeighborhoodSlug(event.target.value)}>
+                {scenarioNeighborhoods.map((neighborhood) => (
+                  <option key={neighborhood.slug} value={neighborhood.slug}>{neighborhood.label}</option>
+                ))}
+              </select>
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+              <label className="block text-sm font-semibold text-slate-700">
+                نطاق التدخل
+                <select
+                  aria-label="نطاق التدخل"
+                  className="city-control mt-1.5"
+                  value={intensity}
+                  onChange={(event) => setIntensity(event.target.value as ScenarioResult["intensity"])}
+                >
+                  <option value="pilot">تجربة محدودة</option>
+                  <option value="standard">قياسي</option>
+                  <option value="expanded">موسّع</option>
+                </select>
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                نمط التنفيذ
+                <select
+                  aria-label="نمط التنفيذ"
+                  className="city-control mt-1.5"
+                  value={executionMode}
+                  onChange={(event) => setExecutionMode(event.target.value as ScenarioResult["execution_mode"])}
+                >
+                  <option value="sequential">متسلسل</option>
+                  <option value="parallel">متوازٍ</option>
+                </select>
+              </label>
+            </div>
+
+            <label className="block text-sm font-semibold text-slate-700">
+              سقف الميزانية بالدولار <span className="font-normal text-slate-400">(اختياري)</span>
+              <input
+                aria-label="سقف الميزانية بالدولار"
+                className="city-control mt-1.5"
+                inputMode="numeric"
+                min="1000"
+                type="number"
+                value={budgetLimit}
+                onChange={(event) => setBudgetLimit(event.target.value)}
+              />
+            </label>
+
+            <div className="border-t border-slate-200 pt-4">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-sm font-bold text-slate-900">التدخلات المحددة</p>
+                <span className="text-xs font-bold tabular-nums text-teal-700">{selectedActions.length} / 5</span>
+              </div>
+              <div className="space-y-2">
+                {selectedActions.map((action) => (
+                  <button
+                    aria-pressed="true"
+                    className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-teal-300 bg-teal-50 px-3 text-right text-sm font-bold text-teal-950 transition hover:border-teal-500"
+                    key={action}
+                    type="button"
+                    onClick={() => toggleAction(action)}
+                  >
+                    <CityIcon className="h-[18px] w-[18px] text-teal-700" name={actionIcon(action)} />
+                    <span className="flex-1">{actionLabel(action)}</span>
+                    <span aria-hidden="true" className="text-lg font-normal text-teal-700">×</span>
+                  </button>
+                ))}
+              </div>
+
+              {availableActions.length ? (
+                <details className="mt-2 rounded-xl border border-slate-200 bg-white open:bg-slate-50">
+                  <summary className="cursor-pointer list-none px-3 py-2.5 text-sm font-bold text-slate-700">+ إضافة تدخل</summary>
+                  <div className="grid gap-2 border-t border-slate-200 p-2">
+                    {availableActions.map((action) => (
+                      <button
+                        aria-pressed="false"
+                        className="flex min-h-10 items-center gap-2 rounded-lg px-2.5 text-right text-xs font-semibold text-slate-700 transition hover:bg-white hover:text-teal-800"
+                        key={action}
+                        type="button"
+                        onClick={() => toggleAction(action)}
+                      >
+                        <CityIcon className="h-4 w-4" name={actionIcon(action)} />
+                        {actionLabel(action)}
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              ) : null}
+            </div>
+
+            <button
+              className="city-primary-button w-full"
+              disabled={isSimulating || selectedActions.length === 0}
+              type="button"
+              onClick={simulate}
+            >
+              <CityIcon className="h-[18px] w-[18px]" name="simulator" />
+              {isSimulating ? "جارٍ حساب الأثر..." : "احسب الأثر التقديري"}
+            </button>
+
+            {errorMessage ? <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-rose-800" role="alert">{errorMessage}</p> : null}
+          </div>
+        </Panel>
+      </div>
+
+      <Panel eyebrow="تقديرات محفوظة للمراجعة" title="نتائج السيناريوهات">
+        <DataTable
+          rows={results}
+          getRowKey={(row) => row.id}
+          columns={[
+            { header: "السيناريو", cell: (row) => <span className="font-bold">{row.scenario_name}</span>, className: "min-w-[260px] px-4 py-3" },
+            { header: "الإجراءات", cell: (row) => row.actions.length },
+            { header: "الكلفة", cell: (row) => `$${Math.round(row.estimated_cost).toLocaleString()}` },
+            { header: "الأيام", cell: (row) => row.implementation_time_days },
+            { header: "الخطر", cell: (row) => <Badge tone={riskTone(row.risk_level)}>{severityLabel(row.risk_level)}</Badge> },
+          ]}
+        />
+      </Panel>
+    </div>
+  );
+}

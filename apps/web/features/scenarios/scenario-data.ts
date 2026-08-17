@@ -1,0 +1,108 @@
+import type { ScenarioResult } from "@/lib/api-client";
+
+export const scenarioActions = [
+  "ADD_TREES",
+  "ADD_BIKE_LANE",
+  "ADD_PARK",
+  "ADD_BUS_STOP",
+  "IMPROVE_WASTE_COLLECTION",
+  "PEDESTRIANIZE_STREET",
+  "CHANGE_TRAFFIC_FLOW",
+  "IMPROVE_SIDEWALKS",
+  "IMPROVE_LIGHTING",
+];
+
+export const scenarioNeighborhoods = [
+  { label: "الميناء", slug: "al-mina" },
+  { label: "التل", slug: "el-tal" },
+  { label: "باب التبانة", slug: "bab-al-tebbaneh" },
+  { label: "جبل محسن", slug: "jabal-mohsen" },
+  { label: "القبة", slug: "qoubbeh" },
+  { label: "أبو سمرا", slug: "abu-samra" },
+  { label: "الأسواق القديمة", slug: "old-souks" },
+  { label: "منطقة المرفأ", slug: "port-area" },
+  { label: "الزاهرية", slug: "al-zahriyeh" },
+];
+
+export const fallbackScenarioResult: ScenarioResult = {
+  id: "local-scenario-1",
+  scenario_name: "تجربة نفايات وأشجار في باب التبانة",
+  neighborhood_slug: "bab-al-tebbaneh",
+  actions: ["ADD_TREES", "IMPROVE_WASTE_COLLECTION"],
+  green_score_delta: 11,
+  temperature_delta: -0.5,
+  air_quality_delta: 4,
+  walkability_delta: 2,
+  traffic_delta: 0,
+  pollution_delta: -6,
+  waste_cleanliness_delta: 10,
+  estimated_cost: 97000,
+  implementation_time_days: 80,
+  risk_level: "medium",
+  confidence_score: 0.75,
+  recommendation: "أعطِ الأولوية لعمليات النظافة مع مراقبة على مستوى الحي.",
+  baseline: {
+    neighborhood_slug: "bab-al-tebbaneh",
+    neighborhood_name: "باب التبانة",
+    priority_level: "critical",
+    measurement_date: "2026-06-16",
+    overall_green_score: 41,
+    green_coverage_score: 34,
+    air_quality_score: 39,
+    waste_cleanliness_score: 32,
+    walkability_score: 38,
+    heat_comfort_score: 42,
+    traffic_pressure_index: 34.3,
+    pollution_pressure_index: 66.65,
+    open_report_count: 2,
+  },
+  projected_scores: {
+    overall_green_score: 52,
+    air_quality_score: 43,
+    waste_cleanliness_score: 42,
+    walkability_score: 40,
+    traffic_pressure_index: 34.3,
+    pollution_pressure_index: 60.65,
+  },
+  uncertainty: {
+    green_score_delta: { low: 8, high: 14 },
+    temperature_delta: { low: -0.7, high: -0.3 },
+    air_quality_delta: { low: 3, high: 5 },
+    walkability_delta: { low: 1, high: 3 },
+    traffic_delta: { low: -0.25, high: 0.25 },
+    pollution_delta: { low: -8, high: -4 },
+    estimated_cost: { low: 76000, high: 118000 },
+    implementation_time_days: { low: 64, high: 96 },
+  },
+  budget: { limit: null, within_budget: true, variance: null },
+  intensity: "standard",
+  execution_mode: "sequential",
+  methodology: {
+    version: "scenario-v2.0",
+    model_type: "neighborhood_calibrated_rule_model",
+    official_decision_ready: false,
+    data_quality_score: 0.68,
+    sources: ["demo_seed_from_tripoli_knowledge", "issue_reports"],
+    interaction_adjustments: [],
+    assumptions: ["Planning estimate only."],
+  },
+  warnings: ["Baseline data is demo-backed and must be replaced before an official decision."],
+  action_impacts: [],
+  persistence_backend: "memory",
+  created_at: "2026-06-16T21:00:00.000Z",
+};
+
+export function actionLabel(action: string): string {
+  const labels: Record<string, string> = {
+    ADD_TREES: "إضافة أشجار",
+    ADD_BIKE_LANE: "إضافة مسار دراجات",
+    ADD_PARK: "إضافة حديقة",
+    ADD_BUS_STOP: "إضافة موقف حافلات",
+    IMPROVE_WASTE_COLLECTION: "تحسين جمع النفايات",
+    PEDESTRIANIZE_STREET: "تحويل شارع للمشاة",
+    CHANGE_TRAFFIC_FLOW: "تعديل تدفق المرور",
+    IMPROVE_SIDEWALKS: "تحسين الأرصفة",
+    IMPROVE_LIGHTING: "تحسين الإنارة",
+  };
+  return labels[action] ?? action;
+}

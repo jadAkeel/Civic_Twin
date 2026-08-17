@@ -1,0 +1,225 @@
+{
+  "metadata": {
+    "project": "CityMind Tripoli",
+    "city": "طرابلس",
+    "country": "لبنان",
+    "demo_data": true,
+    "data_notice": "بيانات تجريبية تقريبية لنموذج CityMind Tripoli. ليست بيانات GIS بلدية رسمية ويجب التحقق منها مع مصادر محلية.",
+    "coordinate_notice": "الإحداثيات مراكز تقريبية تجريبية حول طرابلس، لبنان.",
+    "version": "phase-2-demo-2026-06-16"
+  },
+  "users": [
+    {
+      "full_name": "Jad Akeel",
+      "email": "jadakeel05@gmail.com",
+      "role": "owner",
+      "password_hash": "pbkdf2_sha256$120000$owner-demo-salt$xqkiBLGDlxGkjK9xKPgxOr6BVJdq0dAZ69zEH+pZef8=",
+      "is_active": true
+    },
+    {
+      "full_name": "مواطن تجريبي",
+      "email": "citizen.demo@citymind.local",
+      "role": "citizen",
+      "password_hash": "pbkdf2_sha256$120000$citizen-demo-salt$ShuJqoxxgP68PLBXuhFY3nDEVNGrLDcY5DBrwy5IAXA=",
+      "is_active": true
+    },
+    {
+      "full_name": "مسؤول بلدية تجريبي",
+      "email": "admin.demo@citymind.local",
+      "role": "municipality_admin",
+      "password_hash": "pbkdf2_sha256$120000$admin-demo-salt$AGMkqqVkHcI4ZbwDPWPnodccibDZ1HztdTr9lHMKkO8=",
+      "is_active": true
+    },
+    {
+      "full_name": "محلل حضري تجريبي",
+      "email": "analyst.demo@citymind.local",
+      "role": "analyst",
+      "password_hash": "pbkdf2_sha256$120000$analyst-demo-salt$DyjzvVfqsPjo5wuhJcgJBgRWp16QFITj4eOLoJhYjsg=",
+      "is_active": true
+    },
+    {
+      "full_name": "مشغل شرطة تجريبي",
+      "email": "police.demo@citymind.local",
+      "role": "police",
+      "password_hash": "pbkdf2_sha256$120000$agency-demo-salt$S7UE1jvONT97UakD6XM2qqJM/efgxrPYw0rLeUdSaz8=",
+      "is_active": true
+    },
+    {
+      "full_name": "مشغل الصليب الأحمر اللبناني تجريبي",
+      "email": "redcross.demo@citymind.local",
+      "role": "red_cross",
+      "password_hash": "pbkdf2_sha256$120000$agency-demo-salt$S7UE1jvONT97UakD6XM2qqJM/efgxrPYw0rLeUdSaz8=",
+      "is_active": true
+    },
+    {
+      "full_name": "مشغل الدفاع المدني تجريبي",
+      "email": "civildefense.demo@citymind.local",
+      "role": "civil_defense",
+      "password_hash": "pbkdf2_sha256$120000$agency-demo-salt$S7UE1jvONT97UakD6XM2qqJM/efgxrPYw0rLeUdSaz8=",
+      "is_active": true
+    }
+  ],
+  "neighborhoods": [
+    {
+      "name": "الميناء",
+      "slug": "al-mina",
+      "description": "حي ساحلي تجريبي في طرابلس مع حاجات للتنقل والنفايات وتخطيط المسارات الخضراء.",
+      "city": "طرابلس",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4471, "longitude": 35.8178 },
+      "priority_level": "high"
+    },
+    {
+      "name": "التل",
+      "slug": "el-tal",
+      "description": "منطقة مركزية تجريبية في طرابلس مع نشاط مشاة وازدحام وضغط نقل عام.",
+      "city": "طرابلس",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4374, "longitude": 35.8365 },
+      "priority_level": "critical"
+    },
+    {
+      "name": "باب التبانة",
+      "slug": "bab-al-tebbaneh",
+      "description": "منطقة حضرية كثيفة تجريبية مع حاجات للنفايات والأرصفة والإنارة والتعافي الأخضر.",
+      "city": "طرابلس",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4442, "longitude": 35.8434 },
+      "priority_level": "critical"
+    },
+    {
+      "name": "جبل محسن",
+      "slug": "jabal-mohsen",
+      "description": "منطقة مرتفعة تجريبية في طرابلس مع حاجات للوصول وضغط الخدمات ومراقبة البنية التحتية.",
+      "city": "طرابلس",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4511, "longitude": 35.8503 },
+      "priority_level": "high"
+    },
+    {
+      "name": "القبة",
+      "slug": "qoubbeh",
+      "description": "منطقة سكنية تجريبية في طرابلس مع حاجات لصيانة الطرق وجمع النفايات ومسارات المدارس.",
+      "city": "طرابلس",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4327, "longitude": 35.8613 },
+      "priority_level": "high"
+    },
+    {
+      "name": "أبو سمراء",
+      "slug": "abu-samra",
+      "description": "منطقة سكنية تجريبية في طرابلس مع حاجات لراحة المشي وضغط مواقف وفرص حدائق صغيرة.",
+      "city": "طرابلس",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4252, "longitude": 35.8427 },
+      "priority_level": "medium"
+    },
+    {
+      "name": "الأسواق القديمة",
+      "slug": "old-souks",
+      "description": "منطقة تجارية تراثية تجريبية مع ضغط على المشاة والإنارة والنفايات.",
+      "city": "طرابلس",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4356, "longitude": 35.8449 },
+      "priority_level": "high"
+    },
+    {
+      "name": "منطقة المرفأ",
+      "slug": "port-area",
+      "description": "منطقة تجريبية قرب المرفأ مع حركة مركبات ثقيلة وتعرض للتلوث وتعارضات تنقل.",
+      "city": "طرابلس",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4592, "longitude": 35.8221 },
+      "priority_level": "high"
+    },
+    {
+      "name": "الزاهرية",
+      "slug": "al-zahriyeh",
+      "description": "محور مركزي تجريبي في طرابلس مضاف من قاعدة المعرفة المحلية للتحقق لاحقًا.",
+      "city": "طرابلس",
+      "country": "Lebanon",
+      "center_point": { "latitude": 34.4398, "longitude": 35.8488 },
+      "priority_level": "medium"
+    }
+  ],
+  "issue_reports": [
+    { "title": "تراكم نفايات قرب كتل سكنية كثيفة", "description": "بلاغ تجريبي عن تراكم أكياس النفايات قبل موعد الجمع في باب التبانة.", "category": "garbage", "severity": "critical", "status": "submitted", "source": "demo_seed", "latitude": 34.4446, "longitude": 35.8439, "neighborhood_slug": "bab-al-tebbaneh", "created_by_email": "citizen.demo@citymind.local", "ai_detected_category": "garbage", "ai_confidence": 0.82 },
+    { "title": "ازدحام مروري قرب حركة النقل في التل", "description": "بلاغ تجريبي عن ازدحام حول محور الحركة المركزي.", "category": "traffic_obstruction", "severity": "high", "status": "validated", "source": "demo_seed", "latitude": 34.4378, "longitude": 35.837, "neighborhood_slug": "el-tal" },
+    { "title": "أرصفة متضررة في الأسواق القديمة", "description": "بلاغ تجريبي عن مسارات مشاة غير مستوية في المنطقة التجارية التراثية.", "category": "broken_sidewalk", "severity": "high", "status": "in_progress", "source": "demo_seed", "latitude": 34.4359, "longitude": 35.8445, "neighborhood_slug": "old-souks" },
+    { "title": "نقص إنارة في القبة", "description": "بلاغ تجريبي عن ضعف الرؤية الليلية على مسار مشاة سكني.", "category": "street_lighting", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.4321, "longitude": 35.8618, "neighborhood_slug": "qoubbeh" },
+    { "title": "مخاوف تلوث قرب منطقة المرفأ", "description": "بلاغ تجريبي عن تعرض محسوس للهواء الملوث والضجيج قرب حركة المركبات الثقيلة.", "category": "pollution", "severity": "high", "status": "validated", "source": "demo_seed", "latitude": 34.459, "longitude": 35.8225, "neighborhood_slug": "port-area" },
+    { "title": "مشكلة قابلية مشي في أبو سمراء", "description": "بلاغ تجريبي عن عرقلة حركة المشاة قرب شوارع سكنية.", "category": "accessibility_issue", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.4255, "longitude": 35.8423, "neighborhood_slug": "abu-samra" },
+    { "title": "عائق على الطريق في الميناء", "description": "بلاغ تجريبي عن عائق مؤقت يؤثر على مسار الوصول الساحلي.", "category": "traffic_obstruction", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.4475, "longitude": 35.8184, "neighborhood_slug": "al-mina" },
+    { "title": "مشكلة سلامة عامة قرب جبل محسن", "description": "بلاغ تجريبي عن مسار درج للمشاة ضعيف الإنارة.", "category": "public_safety", "severity": "high", "status": "validated", "source": "demo_seed", "latitude": 34.4515, "longitude": 35.8508, "neighborhood_slug": "jabal-mohsen" },
+    { "title": "حفرة على وصلة القبة", "description": "بلاغ تجريبي عن حالة طريق تؤثر على حركة المركبات السكنية.", "category": "pothole", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.433, "longitude": 35.8607, "neighborhood_slug": "qoubbeh" },
+    { "title": "تسرّب مياه قرب ممر خدمة في الأسواق القديمة", "description": "بلاغ تجريبي عن تسرّب مياه قد يؤثر على راحة المشاة.", "category": "water_leakage", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.4352, "longitude": 35.8453, "neighborhood_slug": "old-souks" },
+    { "title": "نفايات قرب مسار شاحنات المرفأ", "description": "مشكلة نفايات تجريبية قرب حركة لوجستية.", "category": "garbage", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.4585, "longitude": 35.8217, "neighborhood_slug": "port-area" },
+    { "title": "رصيف متضرر على ممشى الميناء الساحلي", "description": "مشكلة رصيف تجريبية على ممر مرشح للتنقل الأخضر.", "category": "broken_sidewalk", "severity": "medium", "status": "validated", "source": "demo_seed", "latitude": 34.4479, "longitude": 35.8172, "neighborhood_slug": "al-mina" },
+    { "title": "مشكلة إنارة في باب التبانة", "description": "مشكلة إنارة تجريبية مرتبطة بالشعور بالأمان أثناء المشي.", "category": "street_lighting", "severity": "high", "status": "submitted", "source": "demo_seed", "latitude": 34.4439, "longitude": 35.8441, "neighborhood_slug": "bab-al-tebbaneh" },
+    { "title": "عائق وصول في جبل محسن", "description": "مشكلة وصول تجريبية على مسار مشاة حاد.", "category": "accessibility_issue", "severity": "high", "status": "submitted", "source": "demo_seed", "latitude": 34.4507, "longitude": 35.8512, "neighborhood_slug": "jabal-mohsen" },
+    { "title": "عرقلة مرور قرب معبر التل", "description": "بلاغ تجريبي عن حركة معبر مغلق قرب النشاط المركزي.", "category": "traffic_obstruction", "severity": "high", "status": "submitted", "source": "demo_seed", "latitude": 34.4371, "longitude": 35.8362, "neighborhood_slug": "el-tal" },
+    { "title": "فيض نفايات في شارع سكني في القبة", "description": "نقطة ضغط تجريبية في جمع النفايات.", "category": "garbage", "severity": "high", "status": "validated", "source": "demo_seed", "latitude": 34.4329, "longitude": 35.8621, "neighborhood_slug": "qoubbeh" },
+    { "title": "مخاوف سلامة عامة في مسار مسائي بالأسواق القديمة", "description": "بلاغ تجريبي مرتبط بالإنارة وازدحام المشاة.", "category": "public_safety", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.436, "longitude": 35.844, "neighborhood_slug": "old-souks" },
+    { "title": "تعرض للتلوث على طريق الميناء", "description": "مخاوف هواء وضجيج تجريبية على محور مزدحم.", "category": "pollution", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.4466, "longitude": 35.8191, "neighborhood_slug": "al-mina" },
+    { "title": "رصيف متضرر قرب مسار مدرسة في أبو سمراء", "description": "مشكلة تجريبية على مسار مشي للمدرسة.", "category": "broken_sidewalk", "severity": "high", "status": "submitted", "source": "demo_seed", "latitude": 34.4248, "longitude": 35.8428, "neighborhood_slug": "abu-samra" },
+    { "title": "مشكلة إنارة قرب محور الزاهرية", "description": "فجوة رؤية تجريبية على محور مركزي في طرابلس.", "category": "street_lighting", "severity": "medium", "status": "submitted", "source": "demo_seed", "latitude": 34.4395, "longitude": 35.8491, "neighborhood_slug": "al-zahriyeh" }
+    ,
+    { "title": "طلب مساعدة طبية قرب التل", "description": "بلاغ تجريبي يتطلب مراجعة يدوية من الصليب الأحمر اللبناني؛ لا يتم إرسال أي فرقة أو إشعار.", "category": "medical_emergency", "severity": "critical", "status": "submitted", "source": "demo_seed", "latitude": 34.4376, "longitude": 35.8368, "neighborhood_slug": "el-tal" },
+    { "title": "مخاوف دخان قرب مستودع في منطقة المرفأ", "description": "بلاغ تجريبي يتطلب مراجعة يدوية من الدفاع المدني؛ إرسال الطوارئ غير مهيأ.", "category": "fire_hazard", "severity": "critical", "status": "validated", "source": "demo_seed", "latitude": 34.4588, "longitude": 35.8222, "neighborhood_slug": "port-area" }
+  ],
+  "green_metrics": [
+    { "neighborhood_slug": "al-mina", "air_quality_score": 55, "green_coverage_score": 57, "waste_cleanliness_score": 56, "walkability_score": 55, "heat_comfort_score": 62, "overall_green_score": 58, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "el-tal", "air_quality_score": 48, "green_coverage_score": 45, "waste_cleanliness_score": 57, "walkability_score": 61, "heat_comfort_score": 51, "overall_green_score": 52, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "bab-al-tebbaneh", "air_quality_score": 39, "green_coverage_score": 34, "waste_cleanliness_score": 32, "walkability_score": 38, "heat_comfort_score": 42, "overall_green_score": 41, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "jabal-mohsen", "air_quality_score": 44, "green_coverage_score": 42, "waste_cleanliness_score": 45, "walkability_score": 42, "heat_comfort_score": 46, "overall_green_score": 45, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "qoubbeh", "air_quality_score": 47, "green_coverage_score": 43, "waste_cleanliness_score": 44, "walkability_score": 47, "heat_comfort_score": 49, "overall_green_score": 49, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "abu-samra", "air_quality_score": 51, "green_coverage_score": 48, "waste_cleanliness_score": 49, "walkability_score": 52, "heat_comfort_score": 50, "overall_green_score": 50, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "old-souks", "air_quality_score": 44, "green_coverage_score": 36, "waste_cleanliness_score": 40, "walkability_score": 64, "heat_comfort_score": 43, "overall_green_score": 46, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "port-area", "air_quality_score": 38, "green_coverage_score": 41, "waste_cleanliness_score": 45, "walkability_score": 39, "heat_comfort_score": 44, "overall_green_score": 43, "measurement_date": "2026-06-16", "source": "demo_seed_assumption" },
+    { "neighborhood_slug": "al-zahriyeh", "air_quality_score": 50, "green_coverage_score": 47, "waste_cleanliness_score": 52, "walkability_score": 56, "heat_comfort_score": 51, "overall_green_score": 51, "measurement_date": "2026-06-16", "source": "demo_seed_assumption" }
+  ],
+  "walkability_metrics": [
+    { "neighborhood_slug": "al-mina", "sidewalk_quality": 55, "crossing_safety": 52, "lighting_quality": 58, "accessibility_score": 54, "slope_comfort": 76, "perceived_safety": 56, "overall_walkability_score": 55, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "el-tal", "sidewalk_quality": 59, "crossing_safety": 54, "lighting_quality": 62, "accessibility_score": 58, "slope_comfort": 72, "perceived_safety": 60, "overall_walkability_score": 61, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "bab-al-tebbaneh", "sidewalk_quality": 34, "crossing_safety": 36, "lighting_quality": 39, "accessibility_score": 37, "slope_comfort": 48, "perceived_safety": 35, "overall_walkability_score": 38, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "jabal-mohsen", "sidewalk_quality": 40, "crossing_safety": 43, "lighting_quality": 41, "accessibility_score": 36, "slope_comfort": 32, "perceived_safety": 45, "overall_walkability_score": 42, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "qoubbeh", "sidewalk_quality": 46, "crossing_safety": 45, "lighting_quality": 48, "accessibility_score": 46, "slope_comfort": 58, "perceived_safety": 47, "overall_walkability_score": 47, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "abu-samra", "sidewalk_quality": 51, "crossing_safety": 50, "lighting_quality": 53, "accessibility_score": 52, "slope_comfort": 62, "perceived_safety": 50, "overall_walkability_score": 52, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "old-souks", "sidewalk_quality": 61, "crossing_safety": 62, "lighting_quality": 60, "accessibility_score": 55, "slope_comfort": 66, "perceived_safety": 63, "overall_walkability_score": 64, "measurement_date": "2026-06-16", "source": "demo_seed_from_tripoli_knowledge" },
+    { "neighborhood_slug": "port-area", "sidewalk_quality": 38, "crossing_safety": 36, "lighting_quality": 42, "accessibility_score": 40, "slope_comfort": 68, "perceived_safety": 37, "overall_walkability_score": 39, "measurement_date": "2026-06-16", "source": "demo_seed_assumption" },
+    { "neighborhood_slug": "al-zahriyeh", "sidewalk_quality": 54, "crossing_safety": 55, "lighting_quality": 57, "accessibility_score": 54, "slope_comfort": 69, "perceived_safety": 55, "overall_walkability_score": 56, "measurement_date": "2026-06-16", "source": "demo_seed_assumption" }
+  ],
+  "city_assets": [
+    { "name": "مقطع طريق ساحلي في الميناء", "asset_type": "road", "status": "active", "neighborhood_slug": "al-mina", "geometry": { "type": "LineString", "coordinates": [[34.4466, 35.8171], [34.4481, 35.8192]] }, "metadata_json": { "demo": true, "source": "demo_seed" } },
+    { "name": "مسار مشاة تراثي في الأسواق القديمة", "asset_type": "sidewalk", "status": "needs_maintenance", "neighborhood_slug": "old-souks", "geometry": { "type": "LineString", "coordinates": [[34.4352, 35.8441], [34.4361, 35.8452]] }, "metadata_json": { "demo": true, "source": "demo_seed" } },
+    { "name": "إنارة شارع سكني في القبة", "asset_type": "street_light", "status": "needs_maintenance", "neighborhood_slug": "qoubbeh", "location": { "latitude": 34.4323, "longitude": 35.8619 }, "metadata_json": { "demo": true } },
+    { "name": "مجموعة حاويات نفايات في باب التبانة", "asset_type": "waste_container", "status": "needs_maintenance", "neighborhood_slug": "bab-al-tebbaneh", "location": { "latitude": 34.4445, "longitude": 35.8438 }, "metadata_json": { "demo": true } },
+    { "name": "موقع مقترح لحديقة صغيرة في أبو سمراء", "asset_type": "park", "status": "planned", "neighborhood_slug": "abu-samra", "location": { "latitude": 34.425, "longitude": 35.8424 }, "metadata_json": { "demo": true } },
+    { "name": "ممر أشجار مقترح في الميناء", "asset_type": "tree", "status": "planned", "neighborhood_slug": "al-mina", "location": { "latitude": 34.4472, "longitude": 35.8182 }, "metadata_json": { "demo": true } },
+    { "name": "موقف حافلات مقترح في التل", "asset_type": "bus_stop", "status": "planned", "neighborhood_slug": "el-tal", "location": { "latitude": 34.4375, "longitude": 35.8368 }, "metadata_json": { "demo": true } },
+    { "name": "علامة موقع تراثي في الأسواق القديمة", "asset_type": "heritage_site", "status": "active", "neighborhood_slug": "old-souks", "location": { "latitude": 34.4357, "longitude": 35.845 }, "metadata_json": { "demo": true } },
+    { "name": "مسار وصول في جبل محسن", "asset_type": "sidewalk", "status": "needs_maintenance", "neighborhood_slug": "jabal-mohsen", "geometry": { "type": "LineString", "coordinates": [[34.4506, 35.8504], [34.4516, 35.8512]] }, "metadata_json": { "demo": true } },
+    { "name": "طريق مركبات ثقيلة في منطقة المرفأ", "asset_type": "road", "status": "active", "neighborhood_slug": "port-area", "geometry": { "type": "LineString", "coordinates": [[34.4584, 35.8214], [34.4595, 35.8232]] }, "metadata_json": { "demo": true } }
+  ],
+  "mobility_edges": [
+    { "name": "طريق تجريبي من الميناء إلى التل", "edge_type": "road", "from_label": "Al Mina", "to_label": "El Tal", "coordinates": [[34.4471, 35.8178], [34.4374, 35.8365]], "length_meters": 2300, "estimated_speed_kmh": 28, "walkability_weight": 0.55, "pollution_weight": 0.62, "safety_weight": 0.58, "accessibility_weight": 0.57 },
+    { "name": "مسار مشاة من التل إلى الأسواق القديمة", "edge_type": "pedestrian_path", "from_label": "El Tal", "to_label": "Old Souks", "coordinates": [[34.4374, 35.8365], [34.4356, 35.8449]], "length_meters": 980, "estimated_speed_kmh": 5, "walkability_weight": 0.68, "pollution_weight": 0.45, "safety_weight": 0.6, "accessibility_weight": 0.56 },
+    { "name": "مسار خدمة من باب التبانة إلى جبل محسن", "edge_type": "informal_route", "from_label": "Bab Al Tebbaneh", "to_label": "Jabal Mohsen", "coordinates": [[34.4442, 35.8434], [34.4511, 35.8503]], "length_meters": 1200, "estimated_speed_kmh": 18, "walkability_weight": 0.42, "pollution_weight": 0.58, "safety_weight": 0.44, "accessibility_weight": 0.38 },
+    { "name": "وصلة سكنية من القبة إلى أبو سمراء", "edge_type": "road", "from_label": "Qoubbeh", "to_label": "Abu Samra", "coordinates": [[34.4327, 35.8613], [34.4252, 35.8427]], "length_meters": 2600, "estimated_speed_kmh": 24, "walkability_weight": 0.49, "pollution_weight": 0.55, "safety_weight": 0.52, "accessibility_weight": 0.5 },
+    { "name": "مسار دراجات ساحلي مقترح في الميناء", "edge_type": "bike_lane", "from_label": "Al Mina north", "to_label": "Al Mina south", "coordinates": [[34.4481, 35.8171], [34.4464, 35.8194]], "length_meters": 800, "estimated_speed_kmh": 14, "walkability_weight": 0.65, "pollution_weight": 0.48, "safety_weight": 0.61, "accessibility_weight": 0.6 }
+  ],
+  "scenarios": [
+    { "name": "إضافة أشجار في باب التبانة", "description": "مسودة سيناريو تجريبي للتعافي الأخضر في منطقة كثيفة في طرابلس.", "neighborhood_slug": "bab-al-tebbaneh", "scenario_type": "add_trees", "status": "draft", "created_by_email": "analyst.demo@citymind.local", "actions": [{ "action_type": "ADD_TREES", "parameters_json": { "tree_count": 80, "demo": true }, "target_point": { "latitude": 34.4442, "longitude": 35.8434 } }] },
+    { "name": "تحسين الأرصفة في الأسواق القديمة", "description": "مسودة سيناريو تجريبي لتحسين قابلية المشي في منطقة تراثية.", "neighborhood_slug": "old-souks", "scenario_type": "improve_sidewalks", "status": "draft", "created_by_email": "analyst.demo@citymind.local", "actions": [{ "action_type": "IMPROVE_SIDEWALKS", "parameters_json": { "segment_meters": 450, "demo": true }, "target_point": { "latitude": 34.4356, "longitude": 35.8449 } }] },
+    { "name": "إضافة موقف حافلات قرب التل", "description": "مسودة سيناريو تجريبي للوصول إلى النقل العام المركزي.", "neighborhood_slug": "el-tal", "scenario_type": "add_bus_stop", "status": "draft", "created_by_email": "analyst.demo@citymind.local", "actions": [{ "action_type": "ADD_BUS_STOP", "parameters_json": { "stop_count": 1, "demo": true }, "target_point": { "latitude": 34.4374, "longitude": 35.8365 } }] },
+    { "name": "تحسين جمع النفايات في القبة", "description": "مسودة سيناريو تجريبي لتخفيف ضغط النفايات السكني.", "neighborhood_slug": "qoubbeh", "scenario_type": "improve_waste_collection", "status": "draft", "created_by_email": "analyst.demo@citymind.local", "actions": [{ "action_type": "IMPROVE_WASTE_COLLECTION", "parameters_json": { "collection_points": 4, "demo": true }, "target_point": { "latitude": 34.4327, "longitude": 35.8613 } }] },
+    { "name": "إضافة مسار دراجات في الميناء", "description": "مسودة سيناريو تجريبي لتجربة تنقل أخضر ساحلية.", "neighborhood_slug": "al-mina", "scenario_type": "add_bike_lane", "status": "draft", "created_by_email": "analyst.demo@citymind.local", "actions": [{ "action_type": "ADD_BIKE_LANE", "parameters_json": { "length_meters": 800, "demo": true }, "target_point": { "latitude": 34.4471, "longitude": 35.8178 } }] }
+  ],
+  "predictions": [
+    { "prediction_type": "waste_accumulation_risk", "neighborhood_slug": "bab-al-tebbaneh", "severity": "critical", "confidence_score": 0.72, "prediction_window_hours": 48, "message": "عنصر نائب تجريبي مبني على قواعد: تكرار بلاغات النفايات يشير إلى ارتفاع خطر تراكم النفايات.", "evidence_json": { "demo": true, "source": "seed_reports" } },
+    { "prediction_type": "congestion_risk", "neighborhood_slug": "el-tal", "severity": "high", "confidence_score": 0.68, "prediction_window_hours": 24, "message": "عنصر نائب تجريبي مبني على قواعد: ضغط الحركة المركزي يشير إلى خطر ازدحام.", "evidence_json": { "demo": true, "source": "seed_reports" } }
+  ],
+  "ai_queries": [
+    { "user_email": "analyst.demo@citymind.local", "question": "أي حي في طرابلس يجب أن يتلقى تدخل نفايات أولًا؟", "answer": "من بيانات البذور التجريبية فقط، لدى باب التبانة أقوى إشارة ضغط نفايات.", "data_sources_json": { "tables": ["issue_reports", "green_metrics"], "demo": true }, "confidence_score": 0.7 }
+  ]
+}

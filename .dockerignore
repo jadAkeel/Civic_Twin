@@ -1,0 +1,16 @@
+.git
+.github
+.agents
+.codex-runtime
+.turbo
+**/.next
+**/.pytest_cache
+**/__pycache__
+**/*.pyc
+**/node_modules
+**/.venv
+.env
+.env.*
+!.env.example
+test-results
+citymind_phase_prompts

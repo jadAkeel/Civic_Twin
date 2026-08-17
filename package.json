@@ -1,0 +1,29 @@
+{
+  "name": "citymind-tripoli",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:local": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/dev_local.ps1",
+    "build": "corepack pnpm --filter @citymind/web build",
+    "lint": "corepack pnpm --filter @citymind/web lint",
+    "typecheck": "corepack pnpm --filter @citymind/shared typecheck && corepack pnpm --filter @citymind/web typecheck",
+    "test:api": "python -m pytest apps/api/tests -q",
+    "test:e2e": "corepack pnpm --filter @citymind/web test:e2e",
+    "audit:prod": "corepack pnpm audit --prod --audit-level high",
+    "validate": "corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test:api && corepack pnpm build",
+    "docker:config": "docker compose -f infra/docker-compose.yml config",
+    "docker:up": "docker compose -f infra/docker-compose.yml up --build",
+    "docker:down": "docker compose -f infra/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "turbo": "2.3.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss@<8.5.18": "8.5.18",
+      "sharp@<0.35.0": "0.35.0"
+    }
+  }
+}

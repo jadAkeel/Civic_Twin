@@ -1,0 +1,101 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-citymind}
+      POSTGRES_USER: ${POSTGRES_USER:-citymind}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - citymind_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-citymind} -d ${POSTGRES_DB:-citymind}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [backend]
+
+  migrate:
+    image: citymind-api:production
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    environment: &api-environment
+      APP_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      DATABASE_READINESS_REQUIRED: "true"
+      OPERATIONAL_PERSISTENCE_BACKEND: database
+      SCENARIO_PERSISTENCE_BACKEND: database
+      SCENARIO_HISTORY_LIMIT: ${SCENARIO_HISTORY_LIMIT:-250}
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:?AUTH_TOKEN_SECRET is required}
+      RATE_LIMIT_BACKEND: database
+      DOCS_ENABLED: "false"
+      AI_PROVIDER: ${AI_PROVIDER:-local_rag}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.6-sol}
+      AI_ALLOW_LOCAL_FALLBACK: ${AI_ALLOW_LOCAL_FALLBACK:-true}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS JSON list is required}
+      TRUSTED_HOSTS: ${TRUSTED_HOSTS:?TRUSTED_HOSTS JSON list is required}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    networks: [backend]
+
+  seed:
+    image: citymind-api:production
+    command: ["python", "-m", "app.seed.load_seed", "--if-empty"]
+    environment: *api-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+    networks: [backend]
+
+  api:
+    image: citymind-api:production
+    environment: *api-environment
+    ports:
+      - "${API_PORT:-8100}:8000"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    networks: [backend, frontend]
+
+  web:
+    image: citymind-web:production
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?PUBLIC_API_URL is required}
+    ports:
+      - "${WEB_PORT:-3100}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/apps/web/.next/cache:uid=10001,gid=10001,mode=0700
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    networks: [frontend]
+
+networks:
+  backend:
+    internal: true
+  frontend:
+
+volumes:
+  citymind_postgres_data:
