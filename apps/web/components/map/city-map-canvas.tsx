@@ -462,12 +462,15 @@ export function CityMapCanvas({
     );
   }
 
-  const selectedCoordinates =
-    selected?.type === "issue" || selected?.type === "asset"
-      ? { latitude: selected.item.latitude, longitude: selected.item.longitude }
-      : selected?.type === "neighborhood"
+  const selectedCoordinates = useMemo(
+    () =>
+      selected?.type === "issue" || selected?.type === "asset"
         ? { latitude: selected.item.latitude, longitude: selected.item.longitude }
-        : null;
+        : selected?.type === "neighborhood"
+          ? { latitude: selected.item.latitude, longitude: selected.item.longitude }
+          : null,
+    [selected],
+  );
 
   useEffect(() => {
     const map = mapRef.current;
@@ -478,7 +481,7 @@ export function CityMapCanvas({
       zoom: Math.max(map.getZoom(), compact ? 14.2 : 14),
       essential: true,
     });
-  }, [compact, focusSelected, mapState, selectedCoordinates?.latitude, selectedCoordinates?.longitude]);
+  }, [compact, focusSelected, mapState, selectedCoordinates]);
 
   return (
     <div className={cn("overflow-hidden rounded-md border border-slate-200 bg-white", className)}>

@@ -31,7 +31,7 @@ test("owner sign-in unlocks municipality navigation", async ({ page }) => {
 
   await page.goto("/");
   await expectPageReady(page, "دخول CityMind Tripoli");
-  await page.getByLabel("البريد الإلكتروني").fill("jadakeel05@gmail.com");
+  await page.getByLabel("البريد الإلكتروني").fill("owner.demo@citymind.local");
   await page.getByLabel("كلمة المرور").fill("owner-demo");
   await page.getByRole("button", { name: "دخول" }).click();
 

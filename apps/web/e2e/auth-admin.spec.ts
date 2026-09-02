@@ -46,7 +46,7 @@ test("admin page loads after owner email and password auth succeeds", async ({ p
 
   await page.goto("/admin");
   await expectPageReady(page, "دخول CityMind Tripoli");
-  await page.getByLabel("البريد الإلكتروني").fill("jadakeel05@gmail.com");
+  await page.getByLabel("البريد الإلكتروني").fill("owner.demo@citymind.local");
   await page.getByLabel("كلمة المرور").fill("owner-demo");
   await page.getByRole("button", { name: "دخول" }).click();
 

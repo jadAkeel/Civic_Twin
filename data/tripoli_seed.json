@@ -10,8 +10,8 @@
   },
   "users": [
     {
-      "full_name": "Jad Akeel",
-      "email": "jadakeel05@gmail.com",
+      "full_name": "CityMind Owner",
+      "email": "owner.demo@citymind.local",
       "role": "owner",
       "password_hash": "pbkdf2_sha256$120000$owner-demo-salt$xqkiBLGDlxGkjK9xKPgxOr6BVJdq0dAZ69zEH+pZef8=",
       "is_active": true

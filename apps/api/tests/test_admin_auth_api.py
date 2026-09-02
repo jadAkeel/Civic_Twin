@@ -7,7 +7,7 @@ from app.modules.reports.router import reset_report_store_for_tests
 
 
 PASSWORDS = {
-    "jadakeel05@gmail.com": "owner-demo",
+    "owner.demo@citymind.local": "owner-demo",
     "admin.demo@citymind.local": "admin-demo",
     "citizen.demo@citymind.local": "citizen-demo",
     "police.demo@citymind.local": "agency-demo",
@@ -27,7 +27,7 @@ def test_local_auth_login_returns_placeholder_token_without_production_claim() -
     reset_user_store_for_tests()
     client = TestClient(app)
 
-    response = client.post("/auth/login", json={"email": "jadakeel05@gmail.com", "password": "owner-demo"})
+    response = client.post("/auth/login", json={"email": "owner.demo@citymind.local", "password": "owner-demo"})
 
     assert response.status_code == 200
     payload = response.json()
@@ -41,7 +41,7 @@ def test_local_auth_rejects_wrong_password() -> None:
     reset_user_store_for_tests()
     client = TestClient(app)
 
-    response = client.post("/auth/login", json={"email": "jadakeel05@gmail.com", "password": "wrong-password"})
+    response = client.post("/auth/login", json={"email": "owner.demo@citymind.local", "password": "wrong-password"})
 
     assert response.status_code == 401
 
@@ -118,7 +118,7 @@ def test_admin_can_update_report_and_asset_status() -> None:
 def test_owner_can_create_user_with_role_and_new_user_can_login() -> None:
     reset_user_store_for_tests()
     client = TestClient(app)
-    owner_token = _token("jadakeel05@gmail.com")
+    owner_token = _token("owner.demo@citymind.local")
     headers = {"Authorization": f"Bearer {owner_token}"}
 
     create_response = client.post(
