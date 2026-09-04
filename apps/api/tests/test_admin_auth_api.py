@@ -11,7 +11,7 @@ from app.modules.reports.router import reset_report_store_for_tests
 
 
 PASSWORDS = {
-    "jadakeel05@gmail.com": "owner-demo",
+    "owner.demo@citymind.local": "owner-demo",
     "admin.demo@citymind.local": "admin-demo",
     "citizen.demo@citymind.local": "citizen-demo",
     "police.demo@citymind.local": "agency-demo",
@@ -31,7 +31,7 @@ def test_local_auth_login_returns_signed_bearer_token_without_persistence_claim(
     reset_user_store_for_tests()
     client = TestClient(app)
 
-    response = client.post("/auth/login", json={"email": "jadakeel05@gmail.com", "password": "owner-demo"})
+    response = client.post("/auth/login", json={"email": "owner.demo@citymind.local", "password": "owner-demo"})
 
     assert response.status_code == 200
     payload = response.json()
@@ -75,7 +75,7 @@ def test_local_auth_rejects_wrong_password() -> None:
     reset_user_store_for_tests()
     client = TestClient(app)
 
-    response = client.post("/auth/login", json={"email": "jadakeel05@gmail.com", "password": "wrong-password"})
+    response = client.post("/auth/login", json={"email": "owner.demo@citymind.local", "password": "wrong-password"})
 
     assert response.status_code == 401
 
@@ -87,7 +87,7 @@ def test_login_rate_limit_blocks_repeated_failed_attempts() -> None:
     responses = [
         client.post(
             "/auth/login",
-            json={"email": "jadakeel05@gmail.com", "password": "wrong-password"},
+            json={"email": "owner.demo@citymind.local", "password": "wrong-password"},
         )
         for _ in range(6)
     ]
@@ -100,12 +100,12 @@ def test_login_rate_limit_blocks_repeated_failed_attempts() -> None:
 def test_auth_me_validates_token_and_returns_public_user() -> None:
     reset_user_store_for_tests()
     client = TestClient(app)
-    token = _token("jadakeel05@gmail.com")
+    token = _token("owner.demo@citymind.local")
 
     response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 200
-    assert response.json()["email"] == "jadakeel05@gmail.com"
+    assert response.json()["email"] == "owner.demo@citymind.local"
     assert response.json()["role"] == "owner"
     assert "password_hash" not in response.json()
 
@@ -196,7 +196,7 @@ def test_admin_status_updates_reject_unknown_values() -> None:
 def test_owner_can_create_user_with_role_and_new_user_can_login() -> None:
     reset_user_store_for_tests()
     client = TestClient(app)
-    owner_token = _token("jadakeel05@gmail.com")
+    owner_token = _token("owner.demo@citymind.local")
     headers = {"Authorization": f"Bearer {owner_token}"}
 
     create_response = client.post(

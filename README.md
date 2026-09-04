@@ -116,7 +116,7 @@ that role in the local seed/user store. These accounts are for development only:
 
 | Role | Email | Password |
 | --- | --- | --- |
-| Owner / mayor | `jadakeel05@gmail.com` | `owner-demo` |
+| Owner / mayor | `owner.demo@citymind.local` | `owner-demo` |
 | Municipality admin | `admin.demo@citymind.local` | `admin-demo` |
 | Citizen | `citizen.demo@citymind.local` | `citizen-demo` |
 | Police portal | `police.demo@citymind.local` | `agency-demo` |

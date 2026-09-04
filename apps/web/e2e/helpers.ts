@@ -346,8 +346,8 @@ const ownerSession = {
   expires_in: 3600,
   production_ready: false,
   user: {
-    full_name: "Jad Akeel",
-    email: "jadakeel05@gmail.com",
+    full_name: "CityMind Owner",
+    email: "owner.demo@citymind.local",
     role: "owner",
     is_active: true,
   },

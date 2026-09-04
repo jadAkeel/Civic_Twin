@@ -261,7 +261,7 @@ function agencyOperatorChecklist(role: CityMindUserRole | "not signed in", repor
 }
 
 export function AdminWorkspace() {
-  const [email, setEmail] = useState("jadakeel05@gmail.com");
+  const [email, setEmail] = useState("owner.demo@citymind.local");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
   const [role, setRole] = useState<CityMindUserRole | "not signed in">("not signed in");
