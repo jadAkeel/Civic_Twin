@@ -1,0 +1,32 @@
+# External uptime check. Runs from GitHub's network (outside the production
+# server), so it still alerts when the whole host is down. A failed run emails the
+# repository's watchers through GitHub notifications.
+#
+# Setup: Settings -> Secrets and variables -> Actions -> Variables:
+#   CITYMIND_API_URL  e.g. https://api.citymind.example
+#   CITYMIND_WEB_URL  e.g. https://citymind.example
+# Until both are set the job is skipped. Scheduled runs are best-effort (GitHub
+# may delay them by several minutes); for paging/SMS, point an uptime service such
+# as Better Stack or UptimeRobot at the same /ready URL as well.
+name: uptime
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    if: ${{ vars.CITYMIND_API_URL != '' && vars.CITYMIND_WEB_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check API readiness and the web app
+        env:
+          CITYMIND_API_URL: ${{ vars.CITYMIND_API_URL }}
+          CITYMIND_WEB_URL: ${{ vars.CITYMIND_WEB_URL }}
+        run: sh scripts/uptime_check.sh

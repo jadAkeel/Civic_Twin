@@ -1,3 +1,13 @@
+# Production stack: PostGIS -> migrate -> bootstrap -> API + web, behind Caddy TLS.
+#   docker compose --env-file .env.production -f infra/docker-compose.prod.yml up --build -d
+# Only Caddy publishes ports; the database is on an internal network with no route out.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
 services:
   db:
     image: postgis/postgis:16-3.4
@@ -12,7 +22,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    shm_size: 256mb
     restart: unless-stopped
+    logging: *default-logging
     networks: [backend]
 
   migrate:
@@ -23,41 +35,75 @@ services:
     command: ["alembic", "upgrade", "head"]
     environment: &api-environment
       APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: json
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       DATABASE_READINESS_REQUIRED: "true"
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-5}
+      DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-10}
       OPERATIONAL_PERSISTENCE_BACKEND: database
       SCENARIO_PERSISTENCE_BACKEND: database
       SCENARIO_HISTORY_LIMIT: ${SCENARIO_HISTORY_LIMIT:-250}
       AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:?AUTH_TOKEN_SECRET is required}
+      AUTH_TOKEN_TTL_SECONDS: ${AUTH_TOKEN_TTL_SECONDS:-3600}
+      AUTH_COOKIE_SAME_SITE: ${AUTH_COOKIE_SAME_SITE:-lax}
       RATE_LIMIT_BACKEND: database
       DOCS_ENABLED: "false"
+      # Demo identities have published passwords; they can never be enabled here.
+      ALLOW_DEMO_USERS: "false"
+      BOOTSTRAP_OWNER_EMAIL: ${BOOTSTRAP_OWNER_EMAIL:?BOOTSTRAP_OWNER_EMAIL is required}
+      BOOTSTRAP_OWNER_PASSWORD: ${BOOTSTRAP_OWNER_PASSWORD:?BOOTSTRAP_OWNER_PASSWORD is required}
       AI_PROVIDER: ${AI_PROVIDER:-local_rag}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.6-sol}
       AI_ALLOW_LOCAL_FALLBACK: ${AI_ALLOW_LOCAL_FALLBACK:-true}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:?PUBLIC_WEB_URL is required, e.g. https://citymind.example}
+      # Account email (verification and password reset). Any SMTP relay works:
+      # Amazon SES, SendGrid, Brevo, Mailgun, Postmark.
+      EMAIL_BACKEND: smtp
+      EMAIL_FROM: ${EMAIL_FROM:?EMAIL_FROM is required, e.g. no-reply@citymind.example}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-CityMind Tripoli}
+      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      EMAIL_VERIFICATION_REQUIRED: ${EMAIL_VERIFICATION_REQUIRED:-true}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      AI_HOSTED_DAILY_REQUEST_LIMIT: ${AI_HOSTED_DAILY_REQUEST_LIMIT:-2000}
+      AI_QUERY_RETENTION_DAYS: ${AI_QUERY_RETENTION_DAYS:-180}
+      AUTH_SESSION_MAX_AGE_SECONDS: ${AUTH_SESSION_MAX_AGE_SECONDS:-43200}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS JSON list is required}
       TRUSTED_HOSTS: ${TRUSTED_HOSTS:?TRUSTED_HOSTS JSON list is required}
+      API_WORKERS: ${API_WORKERS:-2}
+      # Docker's bridge networks; only the Caddy container can set forwarded headers.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-172.16.0.0/12}
     depends_on:
       db:
         condition: service_healthy
     restart: "no"
+    logging: *default-logging
     networks: [backend]
 
   seed:
     image: citymind-api:production
+    # Loads the reference baseline and the bootstrap owner only into an empty
+    # database. It never overwrites operational data.
     command: ["python", "-m", "app.seed.load_seed", "--if-empty"]
     environment: *api-environment
     depends_on:
       migrate:
         condition: service_completed_successfully
     restart: "no"
+    logging: *default-logging
     networks: [backend]
 
   api:
     image: citymind-api:production
     environment: *api-environment
-    ports:
-      - "${API_PORT:-8100}:8000"
     depends_on:
       seed:
         condition: service_completed_successfully
@@ -68,6 +114,11 @@ services:
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+    logging: *default-logging
     networks: [backend, frontend]
 
   web:
@@ -77,8 +128,10 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?PUBLIC_API_URL is required}
-    ports:
-      - "${WEB_PORT:-3100}:3000"
+        # Shown on the public privacy notice (Law 81/2018): who processes the data
+        # and where residents send access, correction and deletion requests.
+        NEXT_PUBLIC_DATA_CONTROLLER_NAME: ${DATA_CONTROLLER_NAME:?DATA_CONTROLLER_NAME is required, e.g. the municipality}
+        NEXT_PUBLIC_PRIVACY_CONTACT_EMAIL: ${PRIVACY_CONTACT_EMAIL:?PRIVACY_CONTACT_EMAIL is required}
     depends_on:
       api:
         condition: service_healthy
@@ -90,6 +143,36 @@ services:
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    logging: *default-logging
+    networks: [frontend]
+
+  proxy:
+    image: caddy:2.8-alpine
+    environment:
+      WEB_DOMAIN: ${WEB_DOMAIN:?WEB_DOMAIN is required, e.g. citymind.example}
+      API_DOMAIN: ${API_DOMAIN:?API_DOMAIN is required, e.g. api.citymind.example}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required for certificate registration}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - citymind_caddy_data:/data
+      - citymind_caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    logging: *default-logging
     networks: [frontend]
 
 networks:
@@ -99,3 +182,5 @@ networks:
 
 volumes:
   citymind_postgres_data:
+  citymind_caddy_data:
+  citymind_caddy_config:

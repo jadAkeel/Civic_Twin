@@ -3,10 +3,11 @@
 CityMind Tripoli is a civic reporting, map, and municipal operations prototype
 for Tripoli, Lebanon.
 
-This repository now contains the Phase 17 prototype baseline: Tripoli-specific
-frontend modules, seed-backed FastAPI endpoints, rule-based engines, readiness
-interfaces, and validation coverage. It is still demo-only and must not be
-treated as official municipal GIS or production operations software.
+The application is hardened for production deployment (see
+`docs/PRODUCTION_READINESS.md`): TLS termination, durable PostgreSQL/PostGIS
+storage, nonce-based CSP, rate limiting, audit events, and CI. The bundled Tripoli
+baseline data is still approximate demo data and must be replaced with
+authoritative municipal datasets before it is treated as official GIS.
 
 ## Phase 1 Scope
 
@@ -109,10 +110,14 @@ Future production integrations should provide these environment-backed services 
 
 ## Local Demo Login
 
-The app now opens with a local demo login screen. The login UI does not ask the
-user to choose a role; citizen access is the default experience, and municipal
-or agency access is unlocked only when the authenticated account already has
-that role in the local seed/user store. These accounts are for development only:
+The app opens with a login screen. The login UI does not ask the user to choose a
+role; citizen access is the default experience, and municipal or agency access is
+unlocked only when the authenticated account already has that role.
+
+The accounts below exist **only when `ALLOW_DEMO_USERS=true`**, which the local
+dev script and `infra/docker-compose.yml` set for you. Their passwords are
+published here, so the API refuses to start in production with that flag on, and
+the seed loader refuses to create them in a production database.
 
 | Role | Email | Password |
 | --- | --- | --- |
@@ -123,11 +128,39 @@ that role in the local seed/user store. These accounts are for development only:
 | Lebanese Red Cross portal | `redcross.demo@citymind.local` | `agency-demo` |
 | Civil Defense portal | `civildefense.demo@citymind.local` | `agency-demo` |
 
-Passwords are checked with PBKDF2 hashes from `data/tripoli_seed.json`, and API
-sessions are signed, expiring, revocable, and stored in Secure HttpOnly cookies
-in production. Production users persist in PostgreSQL. The bundled accounts are
-still demo identities; MFA, recovery, SSO, and final municipal tenancy policy
-remain external production requirements.
+Sessions are signed, expiring and revocable. Browsers hold them in an HttpOnly
+cookie (Secure in production) and send a CSRF token on every write; the raw bearer
+token is only returned to API clients that request it with `?include_token=true`.
+Active sessions slide forward while the operator works. New passwords must be at
+least 10 characters and combine three of: Arabic letters, lowercase, uppercase,
+digits, symbols or spaces; weak and common passwords are rejected.
+
+## Production Accounts
+
+Production starts with exactly one account, created from
+`BOOTSTRAP_OWNER_EMAIL` / `BOOTSTRAP_OWNER_PASSWORD` when the database is first
+seeded. Sign in with it, create named accounts for staff from **الإدارة →
+إدارة الصلاحيات**, then rotate the bootstrap password. The API refuses to demote
+or deactivate the last active owner, so the organisation cannot lock itself out.
+
+## AI Assistant Provider
+
+The assistant always retrieves evidence from CityMind data first and refuses when
+nothing matches. A hosted model, if configured, only rephrases that evidence:
+
+| `AI_PROVIDER` | Needs | Behaviour |
+| --- | --- | --- |
+| `local_rag` (default) | nothing | Deterministic answers from local evidence |
+| `gemini` | `GEMINI_API_KEY` (Google AI Studio) | Gemini phrases the retrieved evidence as structured JSON |
+| `openai` | `OPENAI_API_KEY` | OpenAI Responses API with `store=false` |
+
+Keys are server-side only — never prefix them with `NEXT_PUBLIC_`. Questions are
+redacted (emails, phone numbers, long identifiers) before they leave the server,
+the caller's identity is never sent, and if the provider fails, blocks the request
+or returns an ungrounded answer, the API falls back to the local answer and labels
+it (`AI_ALLOW_LOCAL_FALLBACK=false` turns that into a 503). `/ready/details`
+(owner or municipality admin only) reports the provider and whether its key is
+present, never the key itself; the public `/ready` only reports readiness.
 
 ## Local Setup
 

@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import maplibregl, {
-  type GeoJSONSource,
-  type LngLatLike,
-  type Map as MapLibreMap,
-  type Marker,
-  type StyleSpecification,
+// MapLibre 6 ships ES modules without a default export.
+import * as maplibregl from "maplibre-gl";
+import type {
+  GeoJSONSource,
+  LngLatLike,
+  Map as MapLibreMap,
+  Marker,
+  StyleSpecification,
 } from "maplibre-gl";
 
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +18,6 @@ import {
   TRIPOLI_MAP_CENTER,
   formatMapLabel,
   photoForNeighborhood,
-  tripoliAssetMarkers,
-  tripoliIssueMarkers,
   tripoliMapLayers,
   tripoliNeighborhoodLayers,
   tripoliRouteOverlays,
@@ -27,6 +27,11 @@ import {
   type TripoliNeighborhoodLayer,
   type TripoliRouteOverlay,
 } from "@/features/map/tripoli-map-data";
+
+// Served by scripts/copy-maplibre-worker.mjs from a version-stamped folder.
+if (typeof window !== "undefined") {
+  maplibregl.setWorkerUrl(`/vendor/maplibre/${maplibregl.getVersion()}/maplibre-gl-worker.mjs`);
+}
 
 type Geometry =
   | { type: "Polygon"; coordinates: [number, number][][] }
@@ -107,6 +112,9 @@ const osmStyle: StyleSpecification = {
 };
 
 const emptyCollection: GeoJsonCollection = { type: "FeatureCollection", features: [] };
+// Stable empty defaults so marker effects do not re-run on every render.
+const NO_ISSUES: TripoliIssueMarker[] = [];
+const NO_ASSETS: TripoliAssetMarker[] = [];
 
 const markerKindConfig: Record<
   MapMarkerKind,
@@ -331,8 +339,9 @@ function googleMapsUrl(latitude: number, longitude: number) {
 
 export function CityMapCanvas({
   activeLayers,
-  issues = tripoliIssueMarkers,
-  assets = tripoliAssetMarkers,
+  // No built-in markers: a map without live data shows boundaries only.
+  issues = NO_ISSUES,
+  assets = NO_ASSETS,
   routes = tripoliRouteOverlays,
   selected,
   onSelect,

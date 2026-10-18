@@ -1,0 +1,41 @@
+# TLS termination for CityMind. Caddy obtains and renews certificates automatically
+# (Let's Encrypt) for the two public hostnames. Session cookies are Secure, so the
+# application does not work over plain HTTP in production.
+{
+	email {$ACME_EMAIL}
+	# Caddy is the internet edge, so it must not trust any client-supplied
+	# X-Forwarded-For. Add `servers { trusted_proxies static <lb-cidr> }` only if a
+	# load balancer is placed in front of it.
+}
+
+(security) {
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+	encode zstd gzip
+	log {
+		output stdout
+		format json
+	}
+}
+
+{$WEB_DOMAIN} {
+	import security
+	reverse_proxy web:3000 {
+		health_uri /login
+		health_interval 30s
+	}
+}
+
+{$API_DOMAIN} {
+	import security
+	request_body {
+		max_size 1MB
+	}
+	reverse_proxy api:8000 {
+		health_uri /health
+		health_interval 30s
+	}
+}

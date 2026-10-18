@@ -1,6 +1,7 @@
 import argparse
 import json
-from datetime import date
+import sys
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -8,8 +9,11 @@ from geoalchemy2 import WKTElement
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.security import hash_password
 from app.core.seed import seed_path
 from app.db.session import SessionLocal
+from app.modules.reports.router import _canonical_category
 from app.models import (
     AIQuery,
     AuditEvent,
@@ -49,6 +53,24 @@ def load_seed_file(path: Path = SEED_PATH) -> dict[str, Any]:
         return json.load(seed_file)
 
 
+def _bootstrap_owner(db: Session) -> User | None:
+    """Create the single real owner account from environment secrets, if configured."""
+    email = (settings.bootstrap_owner_email or "").strip().lower()
+    password = settings.bootstrap_owner_password
+    if not email or password is None:
+        return None
+    owner = User(
+        full_name="CityMind Owner",
+        email=email,
+        password_hash=hash_password(password.get_secret_value()),
+        role="owner",
+        is_active=True,
+        email_verified_at=datetime.now(UTC),
+    )
+    db.add(owner)
+    return owner
+
+
 def reset_phase2_tables(db: Session) -> None:
     for model in (
         AuditEvent,
@@ -69,23 +91,52 @@ def reset_phase2_tables(db: Session) -> None:
         db.query(model).delete()
 
 
-def load_seed_data(db: Session, data: dict[str, Any]) -> None:
+def load_seed_data(
+    db: Session,
+    data: dict[str, Any],
+    *,
+    include_demo_users: bool | None = None,
+    include_demo_records: bool | None = None,
+) -> None:
+    """Load the reference baseline.
+
+    Reference data (neighbourhoods, metrics, assets, the walking network and scenario
+    templates) is always loaded. Demo *records* (fictional citizen reports, stored
+    predictions and assistant history) are skipped in production so residents and
+    staff never see invented reports mixed in with real ones.
+    """
     if not data.get("metadata", {}).get("demo_data"):
         raise ValueError("Tripoli seed data must be explicitly marked as demo_data.")
+
+    if include_demo_users is None:
+        include_demo_users = settings.allow_demo_users
+    if include_demo_records is None:
+        include_demo_records = not settings.is_production
+    if include_demo_users and settings.is_production:
+        raise ValueError(
+            "Demo accounts use publicly documented passwords and must never be created in production. "
+            "Set ALLOW_DEMO_USERS=false and provision an owner with BOOTSTRAP_OWNER_EMAIL/PASSWORD."
+        )
 
     reset_phase2_tables(db)
 
     users_by_email: dict[str, User] = {}
-    for item in data.get("users", []):
-        user = User(
-            full_name=item["full_name"],
-            email=item["email"],
-            password_hash=item.get("password_hash"),
-            role=item["role"],
-            is_active=item.get("is_active", True),
-        )
-        db.add(user)
-        users_by_email[item["email"]] = user
+    if include_demo_users:
+        for item in data.get("users", []):
+            user = User(
+                full_name=item["full_name"],
+                email=item["email"],
+                password_hash=item.get("password_hash"),
+                role=item["role"],
+                is_active=item.get("is_active", True),
+                email_verified_at=datetime.now(UTC),
+            )
+            db.add(user)
+            users_by_email[item["email"]] = user
+
+    bootstrap = _bootstrap_owner(db)
+    if bootstrap is not None:
+        users_by_email[bootstrap.email] = bootstrap
 
     neighborhoods_by_slug: dict[str, Neighborhood] = {}
     for item in data["neighborhoods"]:
@@ -119,11 +170,13 @@ def load_seed_data(db: Session, data: dict[str, Any]) -> None:
         )
         db.add(asset)
 
-    for item in data["issue_reports"]:
+    for item in data["issue_reports"] if include_demo_records else []:
         report = IssueReport(
             title=item["title"],
             description=item["description"],
-            category=item["category"],
+            # Stored under the current category names so SQL filters, agency scoping
+            # and aggregates agree with what the API returns.
+            category=_canonical_category(item["category"]),
             severity=item["severity"],
             status=item["status"],
             source=item["source"],
@@ -214,7 +267,7 @@ def load_seed_data(db: Session, data: dict[str, Any]) -> None:
 
     db.flush()
 
-    for item in data.get("predictions", []):
+    for item in data.get("predictions", []) if include_demo_records else []:
         db.add(
             Prediction(
                 prediction_type=item["prediction_type"],
@@ -228,7 +281,7 @@ def load_seed_data(db: Session, data: dict[str, Any]) -> None:
             )
         )
 
-    for item in data.get("ai_queries", []):
+    for item in data.get("ai_queries", []) if include_demo_records else []:
         db.add(
             AIQuery(
                 user=users_by_email.get(item.get("user_email", "")),
@@ -256,14 +309,48 @@ def main() -> None:
         action="store_true",
         help="Load only when the database has no users or neighborhoods; never replace operational data",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Required to wipe and reload a database that already holds operational data",
+    )
     args = parser.parse_args()
+    if args.force and settings.is_production:
+        print(
+            "Refusing --force in production: it deletes every citizen report, account and audit event. "
+            "Restore from a backup instead.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
     data = load_seed_file()
     with SessionLocal() as db:
-        if args.if_empty and database_has_operational_data(db):
+        already_populated = database_has_operational_data(db)
+        if already_populated and args.if_empty:
             print("CityMind database already contains operational data; demo seed was not loaded.")
             return
+        if already_populated and not args.force:
+            print(
+                "Refusing to run: this database already contains operational data and loading the "
+                "baseline deletes every table it manages. Re-run with --if-empty (safe bootstrap) "
+                "or --force (destructive reload).",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
         load_seed_data(db, data)
-    print("Loaded CityMind Tripoli Phase 2 demo seed data.")
+
+    if settings.allow_demo_users:
+        print(
+            "WARNING: demo accounts with publicly documented passwords were created. "
+            "Never enable ALLOW_DEMO_USERS outside local development.",
+            file=sys.stderr,
+        )
+    if not settings.allow_demo_users and not settings.bootstrap_owner_email:
+        print(
+            "WARNING: no accounts were created. Set BOOTSTRAP_OWNER_EMAIL and "
+            "BOOTSTRAP_OWNER_PASSWORD so an owner can sign in.",
+            file=sys.stderr,
+        )
+    print("Loaded the CityMind Tripoli reference baseline.")
 
 
 if __name__ == "__main__":

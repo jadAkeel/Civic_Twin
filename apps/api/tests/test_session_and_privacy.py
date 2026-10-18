@@ -11,7 +11,7 @@ def test_cookie_session_requires_csrf_and_logout_revokes_bearer_token() -> None:
     reset_assistant_queries_for_tests()
     client = TestClient(app)
     login = client.post(
-        "/auth/login",
+        "/auth/login?include_token=true",
         json={"email": "citizen.demo@citymind.local", "password": "citizen-demo"},
     )
     assert login.status_code == 200

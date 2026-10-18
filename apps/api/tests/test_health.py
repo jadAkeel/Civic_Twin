@@ -15,7 +15,7 @@ def test_health_check_returns_citymind_tripoli_metadata() -> None:
         "project": "CityMind Tripoli",
         "city": "Tripoli, Lebanon",
         "environment": "local",
-        "version": "0.1.0",
+        "version": "1.0.0",
     }
 
 
@@ -39,5 +39,8 @@ def test_local_readiness_reports_runtime_data_mode() -> None:
     assert response.json()["status"] == "ready"
     assert response.json()["checks"]["seed_data"] == "ok"
     assert response.json()["checks"]["database"] == "not_required"
-    assert response.json()["runtime_data_mode"] == "demo_seed_and_in_memory"
-    assert response.json()["persistence"]["scenarios"] == "memory"
+    # Configuration details are not public.
+    assert "runtime_data_mode" not in response.json()
+    assert "ai" not in response.json()
+    assert "environment" not in response.json()
+    assert client.get("/ready/details").status_code == 401

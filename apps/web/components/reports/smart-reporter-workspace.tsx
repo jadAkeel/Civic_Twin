@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import type {
   ImageUploadStatus,
   ReportCategory,
@@ -17,15 +18,18 @@ import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
 import {
   categoryLabel,
-  fallbackReports,
   reportCategories,
   reportSeverities,
   statusLabel,
   tripoliNeighborhoodOptions,
 } from "@/features/reports/report-options";
+import { ErrorState, LoadingState } from "@/components/ui/async-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { citymindApi } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { locationSourceLabelArabic, neighborhoodLabel } from "@/lib/display-labels";
+import { smartReportMarkers } from "@/lib/map-markers";
+import { apiErrorMessage } from "@/lib/use-api-resource";
 
 const defaultNeighborhood = tripoliNeighborhoodOptions[2];
 const tripoliBounds = {
@@ -182,12 +186,13 @@ function formatFileSize(sizeBytes: number) {
 }
 
 export function SmartReporterWorkspace() {
-  const [reports, setReports] = useState<SmartReport[]>(fallbackReports);
+  const [reports, setReports] = useState<SmartReport[]>([]);
   const [form, setForm] = useState<FormState>(initialForm);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [apiState, setApiState] = useState<"api" | "fallback">("fallback");
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyReloadToken, setHistoryReloadToken] = useState(0);
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [gpsState, setGpsState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [gpsMessage, setGpsMessage] = useState("");
@@ -195,18 +200,20 @@ export function SmartReporterWorkspace() {
 
   useEffect(() => {
     let mounted = true;
+    setIsLoading(true);
 
     citymindApi.reports
       .listMine()
       .then((apiReports) => {
         if (!mounted) return;
         setReports(apiReports);
-        setApiState("api");
+        setHistoryError(null);
       })
-      .catch(() => {
+      .catch((caught: unknown) => {
         if (!mounted) return;
-        setReports(fallbackReports);
-        setApiState("fallback");
+        // The citizen's own history is either real or absent; never substituted.
+        setReports([]);
+        setHistoryError(apiErrorMessage(caught));
       })
       .finally(() => {
         if (mounted) setIsLoading(false);
@@ -215,6 +222,14 @@ export function SmartReporterWorkspace() {
     return () => {
       mounted = false;
     };
+  }, [historyReloadToken]);
+
+  // Deep links from the home page (/reports?category=fire_hazard) preselect the
+  // category the citizen chose instead of silently defaulting to traffic.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("category");
+    const match = reportCategories.find((category) => category.value === requested);
+    if (match) setForm((current) => ({ ...current, category: match.value }));
   }, []);
 
   useEffect(() => {
@@ -223,8 +238,10 @@ export function SmartReporterWorkspace() {
     };
   }, [imagePreviewUrl]);
 
-  const draftLatitude = Number(form.latitude);
-  const draftLongitude = Number(form.longitude);
+  // Number("") is 0, so an empty field must be rejected before parsing or the map
+  // drops a marker at (0, 0) in the Atlantic.
+  const draftLatitude = form.latitude.trim() === "" ? Number.NaN : Number(form.latitude);
+  const draftLongitude = form.longitude.trim() === "" ? Number.NaN : Number(form.longitude);
   const draftPoint =
     Number.isFinite(draftLatitude) && Number.isFinite(draftLongitude)
       ? { latitude: draftLatitude, longitude: draftLongitude }
@@ -336,21 +353,15 @@ export function SmartReporterWorkspace() {
       setGpsMessage("");
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
       setImagePreviewUrl("");
-      setApiState("api");
     } catch (error) {
-      setErrors({
-        submit:
-          error instanceof Error
-            ? "لم يتم إرسال البلاغ إلى خدمة CityMind. حاول مرة أخرى عندما تكون الخدمة متاحة."
-            : "لم يتم إرسال البلاغ.",
-      });
-      setApiState("fallback");
+      setErrors({ submit: `${apiErrorMessage(error)} لم يتم تسجيل البلاغ لدى البلدية.` });
     } finally {
       setIsSubmitting(false);
     }
   }
 
   const latestReports = reports.slice(0, 4);
+  const myReportMarkers = useMemo(() => smartReportMarkers(reports), [reports]);
   const emergencySelected = ["security_incident", "medical_emergency", "fire_hazard"].includes(form.category);
 
   return (
@@ -393,15 +404,14 @@ export function SmartReporterWorkspace() {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Panel
           title="بلاغ مواطن"
-          eyebrow={apiState === "api" ? "خدمة الإرسال متصلة" : "بيانات تجريبية ظاهرة"}
-          action={<Badge tone={apiState === "api" ? "green" : "amber"}>{isLoading ? "جارٍ التحميل" : apiState === "api" ? "متصل" : "احتياطي محلي"}</Badge>}
+          eyebrow="نموذج بلاغ رسمي"
+          action={
+            <Badge tone={historyError ? "rose" : "green"}>
+              {isLoading ? "جارٍ التحميل" : historyError ? "الخدمة غير متاحة" : "متصل"}
+            </Badge>
+          }
         >
           <form id="citizen-report-form" className="space-y-5" onSubmit={submitReport}>
-            {apiState === "fallback" ? (
-              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-950">
-                خدمة الإرسال غير متصلة. قد تظهر بلاغات تجريبية، لكن البلاغ الجديد لن يُحفظ كإرسال بلدي إلا إذا قبلته خدمة CityMind.
-              </div>
-            ) : null}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm font-medium text-slate-700">
@@ -565,6 +575,7 @@ export function SmartReporterWorkspace() {
                   assets: false,
                 }}
                 draftPoint={draftPoint}
+                issues={myReportMarkers}
                 onMapPick={(point) =>
                   patchForm({
                     latitude: point.latitude.toFixed(6),
@@ -671,13 +682,26 @@ export function SmartReporterWorkspace() {
             <div className="space-y-3 text-sm leading-6 text-slate-700">
               <p>توصية مسارات المشي غير مهيأة بعد.</p>
               <p>يلزم ربط بيانات ظل الأشجار والحرارة وجودة الأرصفة والمرور الحي ومزود التوجيه قبل عرض إرشاد رسمي.</p>
-              <a className="inline-flex min-h-10 items-center rounded-md border border-slate-300 px-3 font-semibold text-slate-800" href="/mobility">
+              <Link className="inline-flex min-h-10 items-center rounded-md border border-slate-300 px-3 font-semibold text-slate-800" href="/mobility">
                 عرض جاهزية المسارات التجريبية
-              </a>
+              </Link>
             </div>
           </Panel>
 
-          <Panel title="آخر البلاغات" eyebrow={apiState === "api" ? "مصدر متصل" : "تجريبي فقط"}>
+          <Panel title="بلاغاتي السابقة" eyebrow="سجل المواطن">
+            {isLoading ? (
+              <LoadingState label="جارٍ تحميل بلاغاتك" />
+            ) : historyError ? (
+              <ErrorState
+                message={historyError}
+                onRetry={() => setHistoryReloadToken((token) => token + 1)}
+              />
+            ) : latestReports.length === 0 ? (
+              <EmptyState
+                title="لم ترسل أي بلاغ بعد"
+                description="عندما ترسل بلاغًا، سيظهر هنا مع رقمه وحالته والجهة التي ستراجعه."
+              />
+            ) : (
             <div className="space-y-3">
               {latestReports.map((report) => (
                 <div key={report.id} className="rounded-md border border-slate-200 bg-white p-3">
@@ -693,6 +717,7 @@ export function SmartReporterWorkspace() {
                 </div>
               ))}
             </div>
+            )}
           </Panel>
         </aside>
       </div>

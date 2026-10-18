@@ -9,8 +9,8 @@ import { useEffect, useMemo, useState } from "react";
 import { CityIcon, type CityIconName } from "@/components/ui/city-icon";
 import { Loader } from "@/components/ui/loader";
 import { cn } from "@/lib/cn";
-import { citymindApi, type AuthLoginResponse, type CityMindUserRole } from "@/lib/api-client";
-import { AUTH_SESSION_EVENT, clearAuthSession, readStoredAuthSession } from "@/lib/auth-session";
+import { AUTH_SESSION_EXPIRED_EVENT, citymindApi, type AuthLoginResponse, type CityMindUserRole } from "@/lib/api-client";
+import { AUTH_SESSION_EVENT, clearAuthSession, readStoredAuthSession, storeAuthSession } from "@/lib/auth-session";
 import { roleLabel } from "@/lib/display-labels";
 
 const residentRoutes = PHASE_FOUR_ROUTES.filter((route) => route.phase === "Resident");
@@ -20,6 +20,10 @@ const MUNICIPALITY_ROLES: CityMindUserRole[] = ["owner", "municipality_admin", "
 const AGENCY_ROLES: CityMindUserRole[] = ["police", "red_cross", "civil_defense"];
 const OPERATIONS_ROLES: CityMindUserRole[] = [...MUNICIPALITY_ROLES, ...AGENCY_ROLES];
 const municipalPlanningPaths = ["/digital-twin"];
+const PUBLIC_STANDALONE_PATHS = ["/privacy", "/forgot-password", "/reset-password", "/verify-email"];
+// Re-validate the cookie session this often while the tab is visible. Each check
+// also slides the server session forward, so an active operator is never cut off.
+const SESSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 const routeIcons: Record<string, CityIconName> = {
   dashboard: "dashboard",
@@ -72,21 +76,71 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<AuthLoginResponse | null>(null);
   const [hasLoadedSession, setHasLoadedSession] = useState(false);
 
+  const [sessionExpired, setSessionExpired] = useState(false);
+
   useEffect(() => {
     function syncSession() {
       setSession(readStoredAuthSession());
       setHasLoadedSession(true);
     }
+    function markExpired() {
+      setSessionExpired(true);
+    }
 
     syncSession();
     window.addEventListener(AUTH_SESSION_EVENT, syncSession);
+    window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, markExpired);
     window.addEventListener("storage", syncSession);
 
     return () => {
       window.removeEventListener(AUTH_SESSION_EVENT, syncSession);
+      window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, markExpired);
       window.removeEventListener("storage", syncSession);
     };
   }, []);
+
+  const signedInEmail = session?.user.email ?? null;
+
+  // localStorage only remembers who signed in; the HttpOnly cookie is the real
+  // credential. Confirm it with the API on load and periodically, and pick up role
+  // or status changes made by an owner without waiting for the next login.
+  useEffect(() => {
+    if (!signedInEmail) return;
+    let active = true;
+
+    async function verify() {
+      if (document.visibilityState === "hidden") return;
+      try {
+        const current = await citymindApi.auth.me();
+        if (!active) return;
+        const stored = readStoredAuthSession();
+        if (!stored) return;
+        const changed =
+          stored.user.role !== current.role ||
+          stored.user.full_name !== current.full_name ||
+          stored.user.is_active !== current.is_active;
+        if (changed) {
+          storeAuthSession({
+            ...stored,
+            user: { full_name: current.full_name, email: current.email, role: current.role, is_active: current.is_active },
+          });
+        }
+      } catch {
+        // A 401 is handled centrally by the API client (storage cleared, expiry event
+        // raised). A network failure is not proof the session ended, so the operator
+        // stays signed in.
+      }
+    }
+
+    void verify();
+    const interval = window.setInterval(verify, SESSION_CHECK_INTERVAL_MS);
+    document.addEventListener("visibilitychange", verify);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", verify);
+    };
+  }, [signedInEmail]);
 
   const canSeeOperations = session ? OPERATIONS_ROLES.includes(session.user.role) : false;
   const canSeeMunicipality = session ? MUNICIPALITY_ROLES.includes(session.user.role) : false;
@@ -113,11 +167,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const homeHref = isAgencyPortal ? "/admin" : canSeeMunicipality ? "/dashboard" : "/";
   const mobileGridColumns = `repeat(${Math.max(1, Math.min(mobileRoutes.length, 5))}, minmax(0, 1fr))`;
   const isAuthRoute = pathname === "/login" || pathname === "/register";
+  // Reachable with or without a session: the privacy notice must be readable before
+  // registering, and email links open in whatever state the browser is in.
+  const isPublicStandaloneRoute = PUBLIC_STANDALONE_PATHS.includes(pathname);
 
   useEffect(() => {
-    if (!hasLoadedSession || session || isAuthRoute) return;
-    router.replace(`/login?next=${encodeURIComponent(pathname)}`);
-  }, [hasLoadedSession, isAuthRoute, pathname, router, session]);
+    if (!hasLoadedSession || session || isAuthRoute || isPublicStandaloneRoute) return;
+    const params = new URLSearchParams({ next: pathname });
+    if (sessionExpired) params.set("expired", "1");
+    router.replace(`/login?${params.toString()}`);
+  }, [hasLoadedSession, isAuthRoute, isPublicStandaloneRoute, pathname, router, session, sessionExpired]);
 
   useEffect(() => {
     if (!hasLoadedSession || !session || isAuthRoute || !isAgencyPortal || pathname.startsWith("/admin")) return;
@@ -137,11 +196,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.replace("/");
   }, [canSeeOperations, currentRoute, hasLoadedSession, isAuthRoute, isMunicipalPlanningPath, router, session]);
 
+  if (isPublicStandaloneRoute) return <div id="citymind-main">{children}</div>;
+
   if (!hasLoadedSession) return <LoadingScreen />;
 
   if (isAuthRoute) {
     if (session) return <LoadingScreen />;
-    return <>{children}</>;
+    return <div id="citymind-main">{children}</div>;
   }
 
   async function signOut() {
@@ -188,7 +249,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="border-t border-white/10 p-4">
               <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-teal-200">
                 <span className="h-2 w-2 rounded-full bg-teal-400 shadow-[0_0_0_4px_rgba(45,212,191,0.1)]" />
-                جاهز لعرض البيانات
+                جلسة آمنة
               </div>
               <p className="text-[11px] leading-5 text-slate-400">{DEMO_DATA_NOTICE}</p>
             </div>
@@ -229,7 +290,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          <main className="px-4 py-5 sm:px-6 lg:px-8 lg:py-5">{children}</main>
+          <main id="citymind-main" tabIndex={-1} className="px-4 py-5 outline-none sm:px-6 lg:px-8 lg:py-5">
+            {children}
+          </main>
+          <footer className="px-4 pb-28 pt-2 text-xs text-slate-500 sm:px-6 lg:px-8 lg:pb-6">
+            <Link className="font-semibold text-teal-700 hover:text-teal-800" href="/privacy">
+              سياسة الخصوصية
+            </Link>
+          </footer>
         </div>
       </div>
 
@@ -245,6 +313,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link
               key={route.key}
               href={route.path}
+              aria-current={active ? "page" : undefined}
               className={cn(
                 "relative flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-1 py-2 text-[10px] font-bold transition",
                 active ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",

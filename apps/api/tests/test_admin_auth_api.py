@@ -22,7 +22,9 @@ PASSWORDS = {
 
 def _token(email: str = "admin.demo@citymind.local") -> str:
     client = TestClient(app)
-    response = client.post("/auth/login", json={"email": email, "password": PASSWORDS[email]})
+    response = client.post(
+        "/auth/login?include_token=true", json={"email": email, "password": PASSWORDS[email]}
+    )
     assert response.status_code == 200
     return response.json()["access_token"]
 
@@ -31,7 +33,10 @@ def test_local_auth_login_returns_signed_bearer_token_without_persistence_claim(
     reset_user_store_for_tests()
     client = TestClient(app)
 
-    response = client.post("/auth/login", json={"email": "owner.demo@citymind.local", "password": "owner-demo"})
+    response = client.post(
+        "/auth/login?include_token=true",
+        json={"email": "owner.demo@citymind.local", "password": "owner-demo"},
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -116,13 +121,13 @@ def test_register_creates_citizen_account_and_rejects_duplicate_email() -> None:
 
     register_response = client.post(
         "/auth/register",
-        json={"full_name": "New Citizen", "email": "new.citizen@example.com", "password": "citizen-pass"},
+        json={"full_name": "New Citizen", "email": "new.citizen@example.com", "password": "Tripoli-Citizen-92", "accept_privacy_policy": True},
     )
     duplicate_response = client.post(
         "/auth/register",
-        json={"full_name": "New Citizen", "email": "new.citizen@example.com", "password": "citizen-pass"},
+        json={"full_name": "New Citizen", "email": "new.citizen@example.com", "password": "Tripoli-Citizen-92", "accept_privacy_policy": True},
     )
-    login_response = client.post("/auth/login", json={"email": "new.citizen@example.com", "password": "citizen-pass"})
+    login_response = client.post("/auth/login", json={"email": "new.citizen@example.com", "password": "Tripoli-Citizen-92"})
 
     assert register_response.status_code == 201
     assert register_response.json()["user"]["role"] == "citizen"
@@ -205,12 +210,12 @@ def test_owner_can_create_user_with_role_and_new_user_can_login() -> None:
             "full_name": "Tripoli Operator",
             "email": "operator@example.com",
             "role": "municipality_admin",
-            "password": "operator-demo",
+            "password": "Trablous-Mun-2026!",
             "is_active": True,
         },
         headers=headers,
     )
-    login_response = client.post("/auth/login", json={"email": "operator@example.com", "password": "operator-demo"})
+    login_response = client.post("/auth/login", json={"email": "operator@example.com", "password": "Trablous-Mun-2026!"})
 
     assert create_response.status_code == 200
     assert create_response.json()["role"] == "municipality_admin"

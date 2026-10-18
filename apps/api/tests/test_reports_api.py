@@ -48,7 +48,10 @@ def test_reports_list_uses_tripoli_seed_data_with_honest_analysis_status() -> No
     reports = response.json()
     assert len(reports) >= 20
     assert reports[0]["id"].startswith("TRP-")
-    assert reports[0]["neighborhood"] in {"باب التبانة", "التل", "الأسواق القديمة"}
+    # Same order as the database path: newest first, then the highest report number.
+    numbers = [int(report["id"].split("-")[-1]) for report in reports]
+    assert numbers == sorted(numbers, reverse=True)
+    assert all(report["neighborhood"] for report in reports)
     assert reports[0]["analysis_status"] in {"not_configured", "manual_review_required"}
     assert "ai_detected_category" not in reports[0]
     assert "ai_confidence" not in reports[0]
@@ -124,7 +127,7 @@ def test_report_status_update_requires_municipality_authentication() -> None:
 
     unauthenticated = client.patch("/reports/TRP-1001/status", json={"status": "in_progress"})
     agency_login = client.post(
-        "/auth/login",
+        "/auth/login?include_token=true",
         json={"email": "police.demo@citymind.local", "password": "agency-demo"},
     )
     agency = client.patch(
@@ -133,7 +136,7 @@ def test_report_status_update_requires_municipality_authentication() -> None:
         headers={"Authorization": f"Bearer {agency_login.json()['access_token']}"},
     )
     municipality_login = client.post(
-        "/auth/login",
+        "/auth/login?include_token=true",
         json={"email": "admin.demo@citymind.local", "password": "admin-demo"},
     )
     municipality = client.patch(

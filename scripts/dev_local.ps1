@@ -73,7 +73,7 @@ function Start-CityMindApi {
   $stderr = Join-Path $RuntimeDir "api-dev-$Port.err.log"
   Start-Process `
     -FilePath "powershell" `
-    -ArgumentList @("-NoProfile", "-Command", "python -m uvicorn app.main:app --host 127.0.0.1 --port $Port") `
+    -ArgumentList @("-NoProfile", "-Command", "`$env:ALLOW_DEMO_USERS='true'; python -m uvicorn app.main:app --host 127.0.0.1 --port $Port") `
     -WorkingDirectory (Join-Path $Root "apps\api") `
     -RedirectStandardOutput $stdout `
     -RedirectStandardError $stderr `
@@ -97,7 +97,7 @@ function Start-CityMindWeb {
 
   $stdout = Join-Path $RuntimeDir "web-dev-$Port.log"
   $stderr = Join-Path $RuntimeDir "web-dev-$Port.err.log"
-  $command = "`$env:NEXT_PUBLIC_API_URL='http://127.0.0.1:$ApiPort'; corepack pnpm --filter @citymind/web exec next dev -H 127.0.0.1 -p $Port"
+  $command = "`$env:NEXT_PUBLIC_API_URL='http://127.0.0.1:$ApiPort'; corepack pnpm --filter @citymind/web run prepare:map-worker; corepack pnpm --filter @citymind/web exec next dev -H 127.0.0.1 -p $Port"
   Start-Process `
     -FilePath "powershell" `
     -ArgumentList @("-NoProfile", "-Command", $command) `
@@ -140,6 +140,8 @@ CityMind local dev is ready:
   Register: http://127.0.0.1:$webPort/register
   Login:    http://127.0.0.1:$webPort/login
   API:      http://127.0.0.1:$apiPort
+
+Demo accounts (local development only) are listed in README.md.
 
 Logs are in $RuntimeDir
 "@

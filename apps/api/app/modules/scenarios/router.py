@@ -75,7 +75,7 @@ def list_scenarios(
     _: dict[str, str] = Depends(require_roles(*SCENARIO_ROLES)),
     db: Session = Depends(get_db),
 ) -> list[dict[str, Any]]:
-    return load_city_snapshot(db)["scenarios"]
+    return load_city_snapshot(db, include_reports=False)["scenarios"]
 
 
 @router.get("/actions")

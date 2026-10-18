@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.rate_limit import enforce_rate_limit
 from app.db.session import get_db
 from app.modules.walkability.calculator import WALKABILITY_WEIGHTS, calculate_walkability_score
 from app.services.city_data import load_city_snapshot
@@ -13,7 +15,7 @@ router = APIRouter(prefix="/walkability", tags=["walkability"])
 
 
 def _score_rows(db: Session) -> list[dict[str, Any]]:
-    seed = load_city_snapshot(db)
+    seed = load_city_snapshot(db, include_reports=False, include_scenarios=False)
     neighborhoods = {item["slug"]: item for item in seed["neighborhoods"]}
     rows: list[dict[str, Any]] = []
 
@@ -39,12 +41,26 @@ def _score_rows(db: Session) -> list[dict[str, Any]]:
 
 
 @router.get("/neighborhoods")
-def list_walkability_scores(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def list_walkability_scores(request: Request, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+    enforce_rate_limit(
+        request,
+        db,
+        scope="walkability.read",
+        limit=settings.public_read_max_attempts,
+        window_seconds=settings.public_query_window_seconds,
+    )
     return _score_rows(db)
 
 
 @router.get("/neighborhoods/{slug}")
-def get_walkability_score(slug: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_walkability_score(slug: str, request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+    enforce_rate_limit(
+        request,
+        db,
+        scope="walkability.read",
+        limit=settings.public_read_max_attempts,
+        window_seconds=settings.public_query_window_seconds,
+    )
     for row in _score_rows(db):
         if row["neighborhood_slug"] == slug:
             return row

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from threading import RLock
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -18,6 +18,8 @@ from app.services.city_data import load_city_snapshot
 
 _memory_queries: list[dict[str, Any]] = []
 _memory_lock = RLock()
+_last_purge: datetime | None = None
+PURGE_INTERVAL = timedelta(hours=1)
 
 
 def reset_queries_for_tests() -> None:
@@ -64,9 +66,21 @@ def save_query(
         provider=provider,
     )
     db.add(row)
+    _purge_expired_queries(db)
     db.commit()
     db.refresh(row)
     return _serialize_query(row)
+
+
+def _purge_expired_queries(db: Session) -> None:
+    """Enforce AI_QUERY_RETENTION_DAYS, at most once an hour per process."""
+    global _last_purge
+    now = datetime.now(UTC)
+    with _memory_lock:
+        if _last_purge is not None and now - _last_purge < PURGE_INTERVAL:
+            return
+        _last_purge = now
+    db.execute(delete(AIQuery).where(AIQuery.created_at < now - timedelta(days=settings.ai_query_retention_days)))
 
 
 def list_queries(db: Session, limit: int) -> list[dict[str, Any]]:

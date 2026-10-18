@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-citymind}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-citymind}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - citymind_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -31,11 +31,17 @@ services:
       SCENARIO_HISTORY_LIMIT: ${SCENARIO_HISTORY_LIMIT:-100}
       AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:-citymind-local-development-secret-change-before-production}
       RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-memory}
+      # Local development only: enables the documented demo accounts.
+      ALLOW_DEMO_USERS: ${ALLOW_DEMO_USERS:-true}
+      # In-memory stores live per process, so development runs a single worker.
+      API_WORKERS: "1"
       AI_PROVIDER: ${AI_PROVIDER:-local_rag}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.6-sol}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
     ports:
-      - "${API_PORT:-8100}:8000"
+      - "127.0.0.1:${API_PORT:-8100}:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -47,7 +53,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://127.0.0.1:8100}
     ports:
-      - "${WEB_PORT:-3100}:3000"
+      - "127.0.0.1:${WEB_PORT:-3100}:3000"
     depends_on:
       api:
         condition: service_healthy
@@ -55,7 +61,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
 
   minio:
     image: minio/minio:RELEASE.2024-12-18T13-15-44Z
@@ -64,8 +70,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-citymind}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-citymind-local-password}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - citymind_minio_data:/data
 

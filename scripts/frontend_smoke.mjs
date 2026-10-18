@@ -17,7 +17,6 @@ const requiredRoutes = [
 const requiredFeatureDirs = [
   "map",
   "reports",
-  "dashboard",
   "green-score",
   "mobility",
   "scenarios",

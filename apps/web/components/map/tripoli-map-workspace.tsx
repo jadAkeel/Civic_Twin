@@ -4,13 +4,17 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 
 import { CityMapCanvas, type CityMapSelection } from "@/components/map/city-map-canvas";
+import { ErrorState } from "@/components/ui/async-state";
 import { Badge } from "@/components/ui/badge";
+import { Loader } from "@/components/ui/loader";
 import { Panel } from "@/components/ui/panel";
+import { reportCategories } from "@/features/reports/report-options";
+import { citymindApi, type PublicAsset, type PublicReport } from "@/lib/api-client";
+import { publicAssetMarkers, publicReportMarkers } from "@/lib/map-markers";
+import { useApiResource } from "@/lib/use-api-resource";
 import {
   formatMapLabel,
   photoForNeighborhood,
-  tripoliAssetMarkers,
-  tripoliIssueMarkers,
   tripoliMapFilterOptions,
   tripoliMapLayers,
   tripoliNeighborhoodLayers,
@@ -60,7 +64,17 @@ function escalationLabel(category: string) {
   return "التصعيد المقترح: البلدية";
 }
 
+const categoryOptions = reportCategories.map((category) => category.value);
+const NO_REPORTS: PublicReport[] = [];
+const NO_ASSETS: PublicAsset[] = [];
+
 export function TripoliMapWorkspace() {
+  // Live, privacy-redacted public feed: new citizen reports appear here as soon as
+  // they are submitted, and sensitive categories carry no location at all.
+  const publicReports = useApiResource(() => citymindApi.publicReports.list());
+  const publicAssets = useApiResource(() => citymindApi.publicAssets.list());
+  const issueMarkers = useMemo(() => publicReportMarkers(publicReports.data ?? NO_REPORTS), [publicReports.data]);
+  const assetMarkers = useMemo(() => publicAssetMarkers(publicAssets.data ?? NO_ASSETS), [publicAssets.data]);
   const [filters, setFilters] = useState<MapFilters>(initialFilters);
   const [layers, setLayers] = useState<Record<TripoliMapLayerId, boolean>>(initialLayers);
   const [selected, setSelected] = useState<CityMapSelection | null>({
@@ -70,7 +84,7 @@ export function TripoliMapWorkspace() {
 
   const filteredIssues = useMemo(
     () =>
-      tripoliIssueMarkers.filter(
+      issueMarkers.filter(
         (issue) =>
           (filters.category === "all" || issue.category === filters.category) &&
           (filters.severity === "all" || issue.severity === filters.severity) &&
@@ -79,17 +93,17 @@ export function TripoliMapWorkspace() {
           (!filters.search ||
             matchesSearch(`${issue.title} ${issue.description} ${issue.neighborhood}`, filters.search)),
       ),
-    [filters],
+    [filters, issueMarkers],
   );
 
   const filteredAssets = useMemo(
     () =>
-      tripoliAssetMarkers.filter(
+      assetMarkers.filter(
         (asset) =>
           (filters.neighborhood === "all" || asset.neighborhood === filters.neighborhood) &&
           (!filters.search || matchesSearch(`${asset.name} ${asset.assetType} ${asset.neighborhood}`, filters.search)),
       ),
-    [filters.neighborhood, filters.search],
+    [assetMarkers, filters.neighborhood, filters.search],
   );
 
   const filteredNeighborhoods = useMemo(
@@ -116,11 +130,26 @@ export function TripoliMapWorkspace() {
           heightClassName="min-h-[620px]"
         />
 
-        {!filteredIssues.length && !filteredAssets.length ? (
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-            لا توجد علامات مطابقة للفلاتر الحالية. جرّب تقليل الفلاتر أو إعادة إظهار البلاغات العامة.
-          </div>
-        ) : null}
+        <div aria-live="polite">
+          {publicReports.status === "loading" ? (
+            <div className="rounded-md border border-slate-200 bg-white p-4">
+              <Loader label="جارٍ تحميل البلاغات العامة" />
+            </div>
+          ) : publicReports.status === "error" ? (
+            <ErrorState
+              message={`${publicReports.error ?? ""} تعرض الخريطة حدود الأحياء فقط إلى حين عودة الخدمة.`}
+              onRetry={() => {
+                publicReports.reload();
+                publicAssets.reload();
+              }}
+              isRetrying={publicReports.isReloading}
+            />
+          ) : !filteredIssues.length && !filteredAssets.length ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+              لا توجد علامات مطابقة للفلاتر الحالية. جرّب تقليل الفلاتر أو إعادة إظهار البلاغات العامة.
+            </div>
+          ) : null}
+        </div>
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MapStat label="البلاغات الظاهرة" value={filteredIssues.length} />
@@ -145,7 +174,7 @@ export function TripoliMapWorkspace() {
             <SelectControl
               label="الفئة"
               value={filters.category}
-              options={["all", ...tripoliMapFilterOptions.categories]}
+              options={["all", ...categoryOptions]}
               onChange={(value) => setFilters((current) => ({ ...current, category: value }))}
             />
             <SelectControl

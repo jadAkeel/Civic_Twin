@@ -56,7 +56,6 @@ export function statusLabelArabic(status: ReportStatus | string) {
     inactive: "غير نشط",
     planned: "مخطط",
     not_configured: "غير مهيأ",
-    local_fallback: "بيانات محلية تجريبية",
     demo_seed: "بيانات تجريبية",
   };
   return labels[status] ?? status;
@@ -73,13 +72,21 @@ export function locationSourceLabelArabic(source: ReportLocationSource) {
 }
 
 export function providerLabel(value: string) {
+  // Hosted providers are reported as "<provider>:<model>".
+  const [provider, model] = value.split(":", 2);
+  if (provider === "google_gemini") return `Google Gemini${model ? ` (${model})` : ""}`;
+  if (provider === "openai_responses") return `OpenAI${model ? ` (${model})` : ""}`;
+
   const labels: Record<string, string> = {
-    api: "مصدر متصل",
-    fallback: "احتياطي محلي",
-    local_fallback: "احتياطي محلي",
+    local_grounded_rag: "أدلة CityMind المحلية",
+    local_grounded_rag_fallback: "أدلة محلية (المزوّد الخارجي غير متاح)",
+    demo_seed_graph: "رسم بياني من بيانات تجريبية",
+    postgis_graph: "رسم بياني من قاعدة البيانات",
     demo_seed: "بيانات تجريبية",
     demo_seed_from_tripoli_knowledge: "بيانات تجريبية من معرفة طرابلس",
     demo_seed_assumption: "افتراض تجريبي",
+    memory_snapshot: "لقطة بيانات محلية",
+    database_snapshot: "قاعدة البيانات",
   };
   return labels[value] ?? value;
 }

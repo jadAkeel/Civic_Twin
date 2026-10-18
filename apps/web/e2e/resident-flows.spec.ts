@@ -4,6 +4,7 @@ import {
   blockApi,
   expectPageReady,
   mockCitizenReportsApi,
+  mockMobilityApi,
   mockCitizenReportSubmitFailure,
   mockStoredCitizenSession,
   mockStoredOwnerSession,
@@ -26,6 +27,24 @@ test("citizen home exposes public actions on mobile", async ({ page }) => {
   await expect(page.getByText("إرسال بلاغ طبي للمراجعة")).toBeVisible();
   await expect(page.getByText("الإبلاغ عن خطر حريق")).toBeVisible();
   await expect(page.getByText("تحليل الصور الآلي")).toBeVisible();
+
+  consoleWatcher.assertNoErrors();
+});
+
+test("home report cards open the form with their category preselected", async ({ page }) => {
+  const consoleWatcher = watchConsole(page);
+  await mockStoredCitizenSession(page);
+  await mockCitizenReportsApi(page);
+
+  await page.goto("/");
+  await page.getByRole("link", { name: /الإبلاغ عن خطر حريق/ }).click();
+  await expect(page).toHaveURL(/\/reports\?category=fire_hazard$/);
+  await expectPageReady(page, "بلّغ عن مشكلة في طرابلس");
+  await expect(page.getByLabel("الفئة")).toHaveValue("fire_hazard");
+
+  await page.goto("/reports?category=not-a-category");
+  await expectPageReady(page, "بلّغ عن مشكلة في طرابلس");
+  await expect(page.getByLabel("الفئة")).toHaveValue("traffic_congestion");
 
   consoleWatcher.assertNoErrors();
 });
@@ -101,7 +120,7 @@ test("citizen report service failure does not look like success", async ({ page 
   await page.getByLabel("عنوان أو مكان يدوي").fill("قرب دوار الميناء، طرابلس");
   await page.getByRole("button", { name: "إرسال البلاغ" }).click();
 
-  await expect(page.getByText("لم يتم إرسال البلاغ إلى خدمة CityMind.")).toBeVisible();
+  await expect(page.getByText("لم يتم تسجيل البلاغ لدى البلدية.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "تم إرسال البلاغ" })).toHaveCount(0);
 
   consoleWatcher.assertNoErrors();
@@ -119,13 +138,14 @@ test("municipality data review prompt buttons and offline answer state work", as
   await expect(page.locator("input").last()).toHaveValue("أين قابلية المشي هي الأضعف؟");
   await page.getByRole("button", { name: "راجع" }).click();
 
-  await expect(page.getByText("غير متاح أثناء توقف خدمة CityMind.")).toBeVisible();
-  await expect(page.getByText("احتياطي محلي").first()).toBeVisible();
+  // An unreachable assistant must say so, never fabricate an answer.
+  await expect(page.getByText("تعذّر الوصول إلى خدمة CityMind").first()).toBeVisible();
+  await expect(page.getByText("للمراجعة البشرية")).toHaveCount(0);
 
   consoleWatcher.assertNoErrors();
 });
 
-test("mobility controls are clearly labeled as demo and unavailable for official routing", async ({ page }) => {
+test("mobility never invents routes when the service is unreachable", async ({ page }) => {
   const consoleWatcher = watchConsole(page);
   await mockStoredCitizenSession(page);
   await blockApi(page);
@@ -134,13 +154,25 @@ test("mobility controls are clearly labeled as demo and unavailable for official
   await expectPageReady(page, "مسارات المشي والمسارات البديلة");
   await expect(page.getByText("توصية مسارات المشي غير مهيأة بعد.")).toBeVisible();
   await expect(page.getByText("مزود توجيه المرور غير مهيأ")).toBeVisible();
-  await expect(page.getByText("احتياطي تجريبي محلي").first()).toBeVisible();
+  await expect(page.getByText("تعذّر الوصول إلى خدمة CityMind").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "إعادة المحاولة" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /الأسرع/ })).toHaveCount(0);
 
-  await page.getByLabel("نقطة الانطلاق").selectOption("Qoubbeh");
-  await page.getByRole("button", { name: /تجريبي: الأسرع/ }).click();
+  consoleWatcher.assertNoErrors();
+});
 
-  await expect(page.getByText("تجريبي: الأسرع").first()).toBeVisible();
-  await expect(page.getByText("هذه نتيجة اختبار/تجربة فقط من بيانات البذور.")).toBeVisible();
+test("mobility compares service routes and labels them as planning output", async ({ page }) => {
+  const consoleWatcher = watchConsole(page);
+  await mockStoredCitizenSession(page);
+  await mockMobilityApi(page);
+
+  await page.goto("/mobility");
+  await expectPageReady(page, "مسارات المشي والمسارات البديلة");
+  await page.getByRole("button", { name: /الأسرع/ }).click();
+
+  await expect(page.getByRole("button", { name: /الأسرع/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("E2E coastal segment")).toBeVisible();
+  await expect(page.getByText("مزوّد التوجيه الرسمي غير مهيأ").first()).toBeVisible();
 
   consoleWatcher.assertNoErrors();
 });

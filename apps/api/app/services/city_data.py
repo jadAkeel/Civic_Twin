@@ -10,16 +10,34 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.config import settings
 from app.core.seed import load_seed
 from app.models.green_metric import GreenMetric
+from app.models.issue_report import IssueReport
 from app.models.neighborhood import Neighborhood
 from app.models.scenario import Scenario
 from app.models.walkability_metric import WalkabilityMetric
-from app.modules.reports.router import list_stored_reports
+from app.modules.reports.router import _canonical_category, list_stored_reports
 
 
-def load_city_snapshot(db: Session) -> dict[str, Any]:
+# Every snapshot consumer (predictions, scenarios, assistant) only looks at open
+# reports, so resolved/rejected history is never read: the cost follows the open
+# backlog, not every report ever filed.
+OPEN_REPORT_STATUSES = ("submitted", "validated", "in_progress")
+
+
+def load_city_snapshot(
+    db: Session, *, include_reports: bool = True, include_scenarios: bool = True
+) -> dict[str, Any]:
+    """Current city data shared by scores, predictions, scenarios and the assistant.
+
+    Callers that never look at reports (the score pages) pass include_reports=False
+    so they do not pay for reading the whole report backlog.
+    """
     if settings.operational_persistence_backend != "database":
         snapshot = deepcopy(load_seed())
-        snapshot["issue_reports"] = [_knowledge_report(report) for report in list_stored_reports(db)]
+        snapshot["issue_reports"] = (
+            [_knowledge_report(report) for report in list_stored_reports(db, statuses=OPEN_REPORT_STATUSES)]
+            if include_reports
+            else []
+        )
         snapshot.setdefault("metadata", {})["source"] = "memory_snapshot"
         return snapshot
 
@@ -37,12 +55,20 @@ def load_city_snapshot(db: Session) -> dict[str, Any]:
         )
     )
     neighborhood_slugs = {row.id: row.slug for row in neighborhoods}
-    scenarios = list(
-        db.scalars(
-            select(Scenario)
-            .options(selectinload(Scenario.actions))
-            .order_by(Scenario.created_at.desc(), Scenario.id.desc())
-        ).all()
+    # Each /scenarios/simulate call stores a "simulated" row. Those are run history,
+    # not the planning library, so they are excluded; otherwise every public score
+    # request and assistant answer would grow with the number of simulations run.
+    scenarios = (
+        list(
+            db.scalars(
+                select(Scenario)
+                .options(selectinload(Scenario.actions))
+                .where(Scenario.status != "simulated")
+                .order_by(Scenario.created_at.desc(), Scenario.id.desc())
+            ).all()
+        )
+        if include_scenarios
+        else []
     )
     return {
         "metadata": {
@@ -94,7 +120,7 @@ def load_city_snapshot(db: Session) -> dict[str, Any]:
             for row in walkability_metrics.values()
             if row.neighborhood_id in neighborhood_slugs
         ],
-        "issue_reports": [_knowledge_report(report) for report in list_stored_reports(db)],
+        "issue_reports": _database_knowledge_reports(db) if include_reports else [],
         "scenarios": [
             {
                 "name": row.name,
@@ -106,6 +132,35 @@ def load_city_snapshot(db: Session) -> dict[str, Any]:
             for row in scenarios
         ],
     }
+
+
+def _database_knowledge_reports(db: Session) -> list[dict[str, Any]]:
+    """Read only the six columns the snapshot needs, without ORM objects or joins
+    to users, so the cost stays proportional to the data actually used."""
+    rows = db.execute(
+        select(
+            IssueReport.id,
+            IssueReport.category,
+            IssueReport.severity,
+            IssueReport.status,
+            Neighborhood.slug,
+            IssueReport.created_at,
+        )
+        .outerjoin(Neighborhood, Neighborhood.id == IssueReport.neighborhood_id)
+        .where(IssueReport.status.in_(OPEN_REPORT_STATUSES))
+        .order_by(IssueReport.created_at.desc(), IssueReport.id.desc())
+    ).all()
+    return [
+        {
+            "report_id": f"TRP-{1000 + report_id}",
+            "category": _canonical_category(category),
+            "severity": severity,
+            "status": status,
+            "neighborhood_slug": slug,
+            "created_at": created_at,
+        }
+        for report_id, category, severity, status, slug, created_at in rows
+    ]
 
 
 def _latest_by_neighborhood(rows: list[Any]) -> dict[int, Any]:

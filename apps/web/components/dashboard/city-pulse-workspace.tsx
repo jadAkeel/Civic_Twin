@@ -1,19 +1,21 @@
 "use client";
 
 import type { ReportCategory } from "@citymind/shared";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { CityMapCanvas } from "@/components/map/city-map-canvas";
+import { AsyncSection, SourceBadge } from "@/components/ui/async-state";
 import { Badge } from "@/components/ui/badge";
 import { CityIcon } from "@/components/ui/city-icon";
 import { DataTable } from "@/components/ui/data-table";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Panel } from "@/components/ui/panel";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { fallbackDashboardSummary } from "@/features/dashboard/dashboard-summary";
 import { categoryLabel, statusLabel } from "@/features/reports/report-options";
 import { citymindApi, type DashboardViewSummary } from "@/lib/api-client";
-import { neighborhoodLabel, providerLabel } from "@/lib/display-labels";
+import { neighborhoodLabel } from "@/lib/display-labels";
+import { smartReportMarkers } from "@/lib/map-markers";
+import { useApiResource } from "@/lib/use-api-resource";
 
 function severityLabel(value: number) {
   if (value >= 3.4) return "حرجة";
@@ -39,33 +41,27 @@ function EmptyDashboardState({ message }: { message: string }) {
 }
 
 export function CityPulseWorkspace() {
-  const [summary, setSummary] = useState<DashboardViewSummary>(fallbackDashboardSummary);
-  const [source, setSource] = useState<"api" | "fallback">("fallback");
-  const [loading, setLoading] = useState(true);
+  const resource = useApiResource<DashboardViewSummary>(() => citymindApi.dashboard.summary());
 
-  useEffect(() => {
-    let mounted = true;
-    citymindApi.dashboard
-      .summary()
-      .then((data) => {
-        if (!mounted) return;
-        setSummary(data);
-        setSource("api");
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setSummary(fallbackDashboardSummary);
-        setSource("fallback");
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
+  return (
+    <AsyncSection resource={resource} loadingLabel="جارٍ تحميل نبض المدينة">
+      {(summary) => (
+        <CityPulseBoard summary={summary} status={resource.status} isReloading={resource.isReloading} />
+      )}
+    </AsyncSection>
+  );
+}
 
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
+function CityPulseBoard({
+  summary,
+  status,
+  isReloading,
+}: {
+  summary: DashboardViewSummary;
+  status: "loading" | "ready" | "error";
+  isReloading: boolean;
+}) {
+  const recentMarkers = useMemo(() => smartReportMarkers(summary.recent_reports), [summary.recent_reports]);
   const maxNeighborhoodScore = useMemo(
     () => Math.max(...summary.top_neighborhoods.map((item) => item.priority_score), 1),
     [summary.top_neighborhoods],
@@ -125,20 +121,16 @@ export function CityPulseWorkspace() {
             <p className="text-xs font-bold text-teal-700">خريطة تشغيل المدينة</p>
             <h2 className="mt-0.5 text-base font-bold text-slate-950">طرابلس لحظة بلحظة</h2>
           </div>
-          <Badge tone={source === "api" ? "green" : "amber"}>
-            {loading ? "جارٍ التحميل" : providerLabel(source)}
-          </Badge>
+          <SourceBadge status={status} isReloading={isReloading} />
         </header>
 
         <div className="grid [direction:ltr] xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0 [direction:rtl]">
-            <CityMapCanvas compact heightClassName="min-h-[320px] lg:min-h-[340px]" />
+            <CityMapCanvas compact heightClassName="min-h-[320px] lg:min-h-[340px]" issues={recentMarkers} />
             <div className="grid border-t border-slate-200 bg-slate-50/80 sm:grid-cols-[1fr_auto_auto]">
               <div className="flex items-center gap-2 px-4 py-3 text-xs leading-5 text-slate-600">
                 <span className="h-2 w-2 shrink-0 rounded-full bg-teal-500" />
-                {source === "api"
-                  ? "بيانات CityMind متصلة؛ GIS الرسمي والإشعارات الخارجية غير مهيأة بعد."
-                  : "بيانات محلية تجريبية؛ لا تعرض اتجاهات رسمية أو تشغيلًا مباشرًا."}
+                بيانات CityMind متصلة؛ GIS الرسمي والإشعارات الخارجية غير مهيأة بعد.
               </div>
               <div className="border-t border-slate-200 px-4 py-3 sm:border-r sm:border-t-0">
                 <p className="text-[11px] text-slate-500">أعلى حي</p>

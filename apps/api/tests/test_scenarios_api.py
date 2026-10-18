@@ -14,7 +14,9 @@ from app.modules.scenarios.router import reset_scenario_results_for_tests
 
 def _headers(email: str = "admin.demo@citymind.local", password: str = "admin-demo") -> dict[str, str]:
     client = TestClient(app)
-    login = client.post("/auth/login", json={"email": email, "password": password})
+    login = client.post(
+        "/auth/login?include_token=true", json={"email": email, "password": password}
+    )
     assert login.status_code == 200
     return {"Authorization": f"Bearer {login.json()['access_token']}"}
 

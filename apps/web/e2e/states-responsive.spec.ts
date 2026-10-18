@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 
-import { blockApi, expectPageReady, mockDelayedDashboardSummary, mockStoredCitizenSession, mockStoredOwnerSession, watchConsole } from "./helpers";
+import {
+  blockApi,
+  expectPageReady,
+  mockDelayedDashboardSummary,
+  mockPublicMapApi,
+  mockStoredCitizenSession,
+  mockStoredOwnerSession,
+  watchConsole,
+} from "./helpers";
 
 test("dashboard shows loading first, then service-backed empty state", async ({ page }) => {
   const consoleWatcher = watchConsole(page);
@@ -8,7 +16,7 @@ test("dashboard shows loading first, then service-backed empty state", async ({ 
   await mockDelayedDashboardSummary(page);
 
   await page.goto("/dashboard");
-  await expect(page.getByText("جارٍ التحميل").first()).toBeVisible();
+  await expect(page.getByText("جارٍ تحميل نبض المدينة")).toBeVisible();
   await expectPageReady(page, "نظرة تشغيلية على بلاغات طرابلس");
 
   await expect(page.getByText("مصدر متصل").first()).toBeVisible();
@@ -45,7 +53,7 @@ test("desktop and mobile layouts expose the right navigation surfaces", async ({
 test("map renders ready state, legend meanings, and marker details", async ({ page }) => {
   const consoleWatcher = watchConsole(page);
   await mockStoredCitizenSession(page);
-  await blockApi(page);
+  await mockPublicMapApi(page);
 
   await page.setViewportSize({ width: 1366, height: 900 });
   await page.goto("/map");
@@ -61,10 +69,26 @@ test("map renders ready state, legend meanings, and marker details", async ({ pa
 
   const markers = page.getByRole("button", { name: /^Map marker:/ });
   await expect(markers.first()).toBeVisible();
-  expect(await markers.count()).toBeGreaterThanOrEqual(4);
+  // Four located public reports; the sensitive medical report has no position.
+  await expect(markers).toHaveCount(4);
+  await expect(page.getByRole("button", { name: /بلاغ قيد المراجعة/ })).toHaveCount(0);
   await markers.first().click();
   await expect(page.getByText("التصعيد المقترح").first()).toBeVisible();
   await expect(page.getByText("الإشعار الخارجي غير مهيأ").first()).toBeVisible();
+
+  consoleWatcher.assertNoErrors();
+});
+
+
+test("map says so when the public feed is unavailable instead of showing sample reports", async ({ page }) => {
+  const consoleWatcher = watchConsole(page);
+  await mockStoredCitizenSession(page);
+  await blockApi(page);
+
+  await page.goto("/map");
+  await expectPageReady(page, "استكشف بلاغات طرابلس وأحياءها وأصول المدينة");
+  await expect(page.getByText("تعرض الخريطة حدود الأحياء فقط إلى حين عودة الخدمة.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Map marker:/ })).toHaveCount(0);
 
   consoleWatcher.assertNoErrors();
 });

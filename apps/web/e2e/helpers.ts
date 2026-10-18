@@ -1,6 +1,6 @@
 import { expect, type Page, type Route } from "@playwright/test";
 
-const API_URL_PATTERN = /127\.0\.0\.1:(8000|8100)|localhost:(8000|8100)|\/api-proxy\//;
+export const API_URL_PATTERN = /127\.0\.0\.1:(8000|8100)|localhost:(8000|8100)|\/api-proxy\//;
 
 type ConsoleWatcher = {
   errors: string[];
@@ -177,7 +177,8 @@ export async function mockAgencySession(page: Page, role: "police" | "red_cross"
 
 export async function mockDeniedAuth(page: Page) {
   await mockMapTiles(page);
-  await page.route(API_URL_PATTERN, routeForStatus(403, { detail: "Access denied" }));
+  // Mirrors the API: rejected credentials are 401 "Invalid email or password".
+  await page.route(API_URL_PATTERN, routeForStatus(401, { detail: "Invalid email or password" }));
 }
 
 export async function mockCitizenRegistration(page: Page) {
@@ -187,10 +188,14 @@ export async function mockCitizenRegistration(page: Page) {
 
     if (url.endsWith("/auth/register")) {
       const body = route.request().postDataJSON();
+      if (body.accept_privacy_policy !== true) {
+        await fulfillJson(route, { detail: "You must accept the privacy policy to create an account" }, 422);
+        return;
+      }
       await fulfillJson(
         route,
         {
-          access_token: "signed-new-citizen-token",
+          csrf_token: "e2e-new-citizen-csrf",
           token_type: "bearer",
           expires_in: 3600,
           production_ready: false,
@@ -308,6 +313,107 @@ export async function mockCitizenReportSubmitFailure(page: Page) {
   });
 }
 
+export const mobilityComparison = {
+  origin: "Al Mina",
+  destination: "Old Souks",
+  route_types: ["fastest", "greenest", "safest", "most_walkable", "accessible"],
+  coordinate_order: "longitude_latitude",
+  future_providers: ["OpenTripPlanner", "GraphHopper", "Valhalla"],
+  options: ["fastest", "greenest", "safest", "most_walkable", "accessible"].map((routeType, index) => ({
+    route_type: routeType,
+    origin: "Al Mina",
+    destination: "Old Souks",
+    distance_meters: 3200 + index * 150,
+    estimated_minutes: 18 + index,
+    score: 18 + index,
+    coordinate_order: "longitude_latitude",
+    provider_interface: "demo_seed_graph",
+    segments: [
+      {
+        id: "edge-1",
+        name: "E2E coastal segment",
+        edge_type: "road",
+        from_label: "Al Mina",
+        to_label: "El Tal",
+        coordinates: [
+          [35.8178, 34.4471],
+          [35.8365, 34.4374],
+        ],
+        length_meters: 2300,
+        estimated_speed_kmh: 28,
+        walkability_weight: 0.55,
+        pollution_weight: 0.62,
+        safety_weight: 0.58,
+        accessibility_weight: 0.57,
+      },
+    ],
+  })),
+};
+
+export async function mockMobilityApi(page: Page) {
+  await mockMapTiles(page);
+  await page.route(API_URL_PATTERN, async (route) => {
+    if (route.request().url().includes("/mobility/routes")) {
+      await fulfillJson(route, mobilityComparison);
+      return;
+    }
+    await route.abort("failed");
+  });
+}
+
+const publicReports = [
+  ["TRP-E2E-P1", "E2E overflowing container", "waste", "critical", "submitted", "bab-al-tebbaneh", 34.445, 35.844],
+  ["TRP-E2E-P2", "E2E blocked junction", "traffic_congestion", "high", "validated", "el-tal", 34.438, 35.837],
+  ["TRP-E2E-P3", "E2E damaged road", "pothole", "medium", "in_progress", "old-souks", 34.436, 35.845],
+  ["TRP-E2E-P4", "E2E street light out", "other", "low", "submitted", "al-mina", 34.447, 35.818],
+  // Sensitive categories arrive from the API without a location and must not be mapped.
+  ["TRP-E2E-P5", "بلاغ قيد المراجعة", "medical_emergency", "critical", "submitted", "qoubbeh", null, null],
+].map(([id, title, category, severity, status, slug, latitude, longitude]) => ({
+  id,
+  title,
+  category,
+  severity,
+  status,
+  neighborhood: slug,
+  neighborhood_slug: slug,
+  approximate_latitude: latitude,
+  approximate_longitude: longitude,
+  created_at: "2026-09-20T08:00:00.000Z",
+}));
+
+const publicAssets = [
+  {
+    id: "asset-e2e-road",
+    name: "E2E coastal road",
+    asset_type: "road",
+    status: "active",
+    neighborhood_slug: "al-mina",
+    longitude: 35.818,
+    latitude: 34.447,
+    line: [
+      [35.8171, 34.4466],
+      [35.8192, 34.4481],
+    ],
+    coordinate_order: "longitude_latitude",
+  },
+];
+
+export async function mockPublicMapApi(page: Page) {
+  await mockMapTiles(page);
+  await page.route(API_URL_PATTERN, async (route) => {
+    const url = route.request().url();
+    if (url.includes("/reports/public")) {
+      await fulfillJson(route, publicReports);
+      return;
+    }
+    if (url.includes("/assets/public")) {
+      await fulfillJson(route, publicAssets);
+      return;
+    }
+    await route.abort("failed");
+  });
+}
+
 export async function expectPageReady(page: Page, heading: string) {
   await expect(page.getByRole("heading", { name: heading })).toBeVisible();
   await expect(page.locator("body")).not.toContainText("Application error");
@@ -322,7 +428,7 @@ function routeForStatus(status: number, body: unknown) {
     });
 }
 
-function fulfillJson(route: Route, body: unknown, status = 200) {
+export function fulfillJson(route: Route, body: unknown, status = 200) {
   return route.fulfill({
     status,
     contentType: "application/json",
@@ -341,7 +447,7 @@ function isRelevantConsoleError(error: string) {
 }
 
 const ownerSession = {
-  access_token: "signed-owner-token",
+  csrf_token: "e2e-owner-csrf",
   token_type: "bearer",
   expires_in: 3600,
   production_ready: false,
@@ -354,7 +460,7 @@ const ownerSession = {
 };
 
 const citizenSession = {
-  access_token: "signed-citizen-token",
+  csrf_token: "e2e-citizen-csrf",
   token_type: "bearer",
   expires_in: 3600,
   production_ready: false,
@@ -368,7 +474,7 @@ const citizenSession = {
 
 const sessionsByRole = {
   police: {
-    access_token: "signed-police-token",
+    csrf_token: "e2e-police-csrf",
     token_type: "bearer",
     expires_in: 3600,
     production_ready: false,
@@ -380,7 +486,7 @@ const sessionsByRole = {
     },
   },
   red_cross: {
-    access_token: "signed-red-cross-token",
+    csrf_token: "e2e-red-cross-csrf",
     token_type: "bearer",
     expires_in: 3600,
     production_ready: false,
@@ -392,7 +498,7 @@ const sessionsByRole = {
     },
   },
   civil_defense: {
-    access_token: "signed-civil-defense-token",
+    csrf_token: "e2e-civil-defense-csrf",
     token_type: "bearer",
     expires_in: 3600,
     production_ready: false,

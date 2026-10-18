@@ -10,7 +10,12 @@ from app.core.audit import record_audit_event
 from app.core.config import settings
 from app.core.rate_limit import enforce_rate_limit
 from app.db.session import get_db
-from app.modules.assistant.provider import AssistantProviderError, build_assistant_provider
+from app.modules.assistant.provider import (
+    AssistantProviderError,
+    build_assistant_provider,
+    hosted_call_budget,
+    redact_personal_data,
+)
 from app.modules.assistant.repository import (
     list_queries as list_stored_queries,
     load_knowledge_snapshot,
@@ -18,6 +23,7 @@ from app.modules.assistant.repository import (
     save_query,
 )
 from app.modules.auth.router import current_user, require_roles
+from app.schemas.reports import contains_control_characters
 
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
@@ -31,6 +37,10 @@ class AssistantQuestion(BaseModel):
     @field_validator("question")
     @classmethod
     def normalize_question(cls, value: str) -> str:
+        # NUL and other control characters are rejected by PostgreSQL (a 500 when the
+        # question is stored) and have no place in a question.
+        if contains_control_characters(value):
+            raise ValueError("Question contains control characters")
         normalized = " ".join(value.split())
         if len(normalized) < 4:
             raise ValueError("Question must contain at least four visible characters")
@@ -39,6 +49,7 @@ class AssistantQuestion(BaseModel):
 
 def reset_assistant_queries_for_tests() -> None:
     reset_queries_for_tests()
+    hosted_call_budget.reset()
 
 
 @router.post("/query", status_code=201)
@@ -57,12 +68,16 @@ def ask_city(
         window_seconds=settings.public_query_window_seconds,
     )
     snapshot = load_knowledge_snapshot(db)
+    # End the read transaction before the (possibly slow) hosted-model call so this
+    # request does not pin a pooled connection for up to the provider timeout.
+    db.commit()
     try:
         result = _provider.answer(payload.question, snapshot, safety_identifier=user["email"])
         stored = save_query(
             db,
             user_email=user["email"],
-            question=payload.question,
+            # History is readable by staff, so contact details are never stored.
+            question=redact_personal_data(payload.question),
             result=result,
             provider=result["provider"],
         )

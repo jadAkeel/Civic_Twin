@@ -11,13 +11,26 @@ import type {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8100";
 
+const REQUEST_TIMEOUT_MS = 15_000;
+
 type RequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
   headers?: HeadersInit;
+  timeoutMs?: number;
+  signal?: AbortSignal;
 };
 
 const AUTH_SESSION_STORAGE_KEY = "citymind.localSession";
+export const AUTH_SESSION_EXPIRED_EVENT = "citymind.authSessionExpired";
+
+function hadStoredSession(): boolean {
+  try {
+    return window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
 
 function storedCsrfToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -167,6 +180,8 @@ export type MobilityRouteOption = {
   estimated_minutes: number;
   score: number;
   segments: MobilityEdge[];
+  /** Always "longitude_latitude" (GeoJSON order) for every segment coordinate. */
+  coordinate_order?: string;
   provider_interface: string;
 };
 
@@ -174,7 +189,9 @@ export type MobilityRouteComparison = {
   origin: string;
   destination: string;
   route_types: MobilityRouteOption["route_type"][];
+  coordinate_order?: string;
   options: MobilityRouteOption[];
+  available_points?: string[];
   future_providers: string[];
 };
 
@@ -263,6 +280,32 @@ export type PredictionSignal = {
   evidence_json: Record<string, unknown>;
 };
 
+export type PublicReport = {
+  id: string;
+  title: string;
+  category: SmartReport["category"];
+  severity: SmartReport["severity"];
+  status: SmartReport["status"];
+  neighborhood: string;
+  neighborhood_slug: string | null;
+  approximate_latitude: number | null;
+  approximate_longitude: number | null;
+  created_at: string;
+};
+
+export type PublicAsset = {
+  id: string;
+  name: string;
+  asset_type: string;
+  status: "active" | "needs_maintenance" | "inactive" | "planned";
+  neighborhood_slug: string | null;
+  longitude: number;
+  latitude: number;
+  /** GeoJSON order ([longitude, latitude]); empty for point assets. */
+  line: number[][];
+  coordinate_order: "longitude_latitude";
+};
+
 export type AssistantQuery = {
   id: string;
   question: string;
@@ -274,7 +317,8 @@ export type AssistantQuery = {
 };
 
 export type AuthLoginResponse = {
-  access_token: string;
+  /** Only present for non-browser API clients that ask for it explicitly. */
+  access_token?: string;
   csrf_token?: string;
   token_type: "bearer";
   expires_in: number;
@@ -304,6 +348,16 @@ export type CityMindUser = {
   is_active: boolean;
   password?: string;
 };
+
+export type CityMindSessionUser = AuthLoginResponse["user"] & { expires_in?: number };
+
+/** Returned instead of a session when the account must confirm its email first. */
+export type VerificationPendingResponse = { verification_required: true; email: string };
+export type RegisterResponse = AuthLoginResponse | VerificationPendingResponse;
+
+export function isVerificationPending(response: RegisterResponse): response is VerificationPendingResponse {
+  return "verification_required" in response && response.verification_required === true;
+}
 
 export type AdminOverview = {
   portal_name: string;
@@ -346,7 +400,9 @@ export type AdminAsset = {
 export class ApiClientError extends Error {
   constructor(
     message: string,
+    /** HTTP status, or 0 when the request never reached the API. */
     public readonly status?: number,
+    public readonly cause?: unknown,
   ) {
     super(message);
     this.name = "ApiClientError";
@@ -356,21 +412,50 @@ export class ApiClientError extends Error {
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
   const csrfToken = method === "GET" ? null : storedCsrfToken();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
-      ...options.headers,
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-    cache: "no-store",
-    credentials: "include",
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? REQUEST_TIMEOUT_MS);
+  if (options.signal) {
+    options.signal.addEventListener("abort", () => controller.abort(), { once: true });
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+        ...options.headers,
+      },
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      cache: "no-store",
+      credentials: "include",
+      signal: controller.signal,
+    });
+  } catch (cause) {
+    // Network failure, DNS failure, CORS rejection or timeout. Status 0 lets callers
+    // tell "service unreachable" apart from a real HTTP error.
+    throw new ApiClientError(
+      controller.signal.aborted
+        ? "انتهت مهلة الاتصال بخدمة CityMind."
+        : "تعذّر الوصول إلى خدمة CityMind.",
+      0,
+      cause,
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
-    if (response.status === 401 && typeof window !== "undefined") {
-      window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+    // Only a 401 on a request made while signed in means the session ended; a wrong
+    // password on the login form is a normal 401 and must not look like an expiry.
+    if (response.status === 401 && typeof window !== "undefined" && hadStoredSession()) {
+      try {
+        window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+      } catch {
+        // Storage unavailable; the events below still reset the shell.
+      }
+      window.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT));
       window.dispatchEvent(new Event("citymind.authSessionChanged"));
     }
     const errorPayload = (await response.json().catch(() => null)) as { detail?: string } | null;
@@ -378,7 +463,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
+  return (await response.json()) as T;
 }
 
 function toSmartReport(report: SmartReportApi): SmartReport {
@@ -457,11 +542,10 @@ export const citymindApi = {
       });
       return toSmartReport(report);
     },
-    updateStatus: async (token: string, id: string, input: SmartReportStatusUpdate) => {
+    updateStatus: async (id: string, input: SmartReportStatusUpdate) => {
       const report = await request<SmartReportApi>(`/reports/${id}/status`, {
         method: "PATCH",
         body: input,
-        headers: { Authorization: `Bearer ${token}` },
       });
       return toSmartReport(report);
     },
@@ -496,21 +580,21 @@ export const citymindApi = {
       request<MobilityRouteComparison>(
         `/mobility/routes?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`,
       ),
+    points: () => request<string[]>("/mobility/points"),
   },
   scenarios: {
-    simulate: (token: string, input: ScenarioSimulationInput) =>
-      request<ScenarioResult>("/scenarios/simulate", {
-        method: "POST",
-        body: input,
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-    results: (token: string) =>
-      request<ScenarioResult[]>("/scenarios/results", {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
+    simulate: (input: ScenarioSimulationInput) =>
+      request<ScenarioResult>("/scenarios/simulate", { method: "POST", body: input, timeoutMs: 30_000 }),
+    results: () => request<ScenarioResult[]>("/scenarios/results"),
   },
   predictions: {
     list: () => request<PredictionSignal[]>("/predictions"),
+  },
+  publicReports: {
+    list: () => request<PublicReport[]>("/reports/public"),
+  },
+  publicAssets: {
+    list: () => request<PublicAsset[]>("/assets/public"),
   },
   assistant: {
     ask: (question: string) =>
@@ -526,55 +610,57 @@ export const citymindApi = {
         method: "POST",
         body: { email, password },
       }),
-    register: (fullName: string, email: string, password: string) =>
-      request<AuthLoginResponse>("/auth/register", {
+    register: (fullName: string, email: string, password: string, acceptPrivacyPolicy: boolean) =>
+      request<RegisterResponse>("/auth/register", {
         method: "POST",
-        body: { full_name: fullName, email, password },
+        body: { full_name: fullName, email, password, accept_privacy_policy: acceptPrivacyPolicy },
       }),
-    me: (token: string) =>
-      request<AuthLoginResponse["user"]>("/auth/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
+    verifyEmail: (token: string) =>
+      request<{ verified: true; email: string }>("/auth/verify-email", { method: "POST", body: { token } }),
+    resendVerification: (email: string) =>
+      request<{ status: string }>("/auth/verify-email/resend", { method: "POST", body: { email } }),
+    forgotPassword: (email: string) =>
+      request<{ status: string }>("/auth/password/forgot", { method: "POST", body: { email } }),
+    resetPassword: (token: string, password: string) =>
+      request<{ reset: true; email: string }>("/auth/password/reset", { method: "POST", body: { token, password } }),
+    me: () => request<CityMindSessionUser>("/auth/me"),
     logout: () => request<void>("/auth/logout", { method: "POST" }),
   },
   admin: {
-    overview: (token: string) =>
-      request<AdminOverview>("/admin/overview", {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-    reports: (token: string) =>
-      request<SmartReportApi[]>("/admin/reports", {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then((reports) => reports.map(toSmartReport)),
-    report: (token: string, id: string) =>
-      request<SmartReportApi>(`/admin/reports/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then(toSmartReport),
-    updateReportStatus: (token: string, id: string, status: SmartReportStatusUpdate["status"]) =>
-      request<SmartReportApi>(`/admin/reports/${id}/status`, {
-        method: "PATCH",
-        body: { status },
-        headers: { Authorization: `Bearer ${token}` },
-      }).then(toSmartReport),
-    assets: (token: string) =>
-      request<AdminAsset[]>("/admin/assets", {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-    updateAssetStatus: (token: string, id: string, status: AdminAsset["status"]) =>
-      request<AdminAsset>(`/admin/assets/${id}/status`, {
-        method: "PATCH",
-        body: { status },
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-    users: (token: string) =>
-      request<CityMindUser[]>("/admin/users", {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-    upsertUser: (token: string, input: CityMindUser) =>
-      request<CityMindUser>("/admin/users", {
-        method: "POST",
-        body: input,
-        headers: { Authorization: `Bearer ${token}` },
-      }),
+    overview: () => request<AdminOverview>("/admin/overview"),
+    reports: () => request<SmartReportApi[]>("/admin/reports").then((reports) => reports.map(toSmartReport)),
+    report: (id: string) => request<SmartReportApi>(`/admin/reports/${id}`).then(toSmartReport),
+    updateReportStatus: (id: string, status: SmartReportStatusUpdate["status"]) =>
+      request<SmartReportApi>(`/admin/reports/${id}/status`, { method: "PATCH", body: { status } }).then(toSmartReport),
+    assets: () => request<AdminAsset[]>("/admin/assets"),
+    updateAssetStatus: (id: string, status: AdminAsset["status"]) =>
+      request<AdminAsset>(`/admin/assets/${id}/status`, { method: "PATCH", body: { status } }),
+    users: () => request<CityMindUser[]>("/admin/users"),
+    upsertUser: (input: CityMindUser) => request<CityMindUser>("/admin/users", { method: "POST", body: input }),
   },
 };
+
+/**
+ * Report a crash caught by an error boundary. Best effort: it must never throw or
+ * trigger the session-expiry handling, so it bypasses request().
+ */
+export function reportClientError(details: { message: string; digest?: string; boundary: string }): void {
+  if (typeof window === "undefined") return;
+  try {
+    void fetch(`${API_BASE_URL}/telemetry/client-errors`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: details.message.slice(0, 500),
+        digest: details.digest?.slice(0, 120),
+        boundary: details.boundary,
+        // Path only: the fragment can hold a one-time account token.
+        path: window.location.pathname.slice(0, 300),
+      }),
+      keepalive: true,
+      credentials: "omit",
+    }).catch(() => undefined);
+  } catch {
+    // Reporting must never make an error screen worse.
+  }
+}

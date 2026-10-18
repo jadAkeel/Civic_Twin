@@ -1,4 +1,6 @@
-from sqlalchemy import Boolean, CheckConstraint, Integer, String
+from datetime import datetime
+
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -17,6 +19,9 @@ class User(TimestampMixin, Base):
     password_hash: Mapped[str | None] = mapped_column(String(512))
     role: Mapped[str] = mapped_column(String(40), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    # Null until the owner of the address follows the verification link. Accounts
+    # created by an owner (or bootstrapped) are verified on creation.
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     tenant_key: Mapped[str] = mapped_column(
         String(80),

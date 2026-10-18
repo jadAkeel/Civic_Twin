@@ -1,19 +1,20 @@
 {
   "name": "@citymind/web",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/copy-maplibre-worker.mjs && next dev",
+    "build": "node scripts/copy-maplibre-worker.mjs && next build",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "test:e2e": "playwright test -c ../../playwright.config.ts",
     "test:e2e:headed": "playwright test -c ../../playwright.config.ts --headed",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepare:map-worker": "node scripts/copy-maplibre-worker.mjs"
   },
   "dependencies": {
     "@citymind/shared": "workspace:*",
-    "maplibre-gl": "^5.24.0",
-    "next": "15.5.21",
+    "maplibre-gl": "^6.11.0",
+    "next": "15.5.26",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },
@@ -24,8 +25,8 @@
     "@types/react-dom": "18.3.5",
     "autoprefixer": "10.4.20",
     "eslint": "8.57.1",
-    "eslint-config-next": "15.5.21",
-    "postcss": "8.5.18",
+    "eslint-config-next": "15.5.26",
+    "postcss": "8.5.28",
     "tailwindcss": "3.4.17",
     "typescript": "5.7.2"
   }

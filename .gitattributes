@@ -1,0 +1,7 @@
+# Files executed on Linux (containers, the production host) must keep LF endings
+# even when the repository is checked out on Windows.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+Caddyfile   text eol=lf
+*.yml       text eol=lf
+*.py        text eol=lf

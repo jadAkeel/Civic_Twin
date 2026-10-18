@@ -8,7 +8,7 @@ from app.modules.auth.router import reset_user_store_for_tests
 def _admin_headers(client: TestClient) -> dict[str, str]:
     reset_user_store_for_tests()
     response = client.post(
-        "/auth/login",
+        "/auth/login?include_token=true",
         json={"email": "admin.demo@citymind.local", "password": "admin-demo"},
     )
     assert response.status_code == 200

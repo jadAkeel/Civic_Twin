@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from geoalchemy2 import WKTElement
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.audit import record_audit_event
@@ -21,11 +21,15 @@ from app.models.user import User
 from app.modules.auth.router import current_user, require_roles
 from app.schemas.reports import (
     PublicReportRead,
+    ReportCategory,
+    ReportSeverity,
+    ReportStatus,
     ReportCategorySuggestion,
     ReportCreate,
     ReportImageAnalysis,
     ReportRead,
     ReportStatusUpdate,
+    contains_control_characters,
 )
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -182,6 +186,19 @@ def _suggest_category(title: str, description: str) -> tuple[str, float, str]:
     return best_category, confidence, "Keyword helper only; no automated image analysis or model inference was performed."
 
 
+SENSITIVE_CATEGORIES = frozenset({"security_incident", "medical_emergency", "fire_hazard"})
+# The public feed lists reports that are still relevant to residents; rejected and
+# duplicate reports are internal outcomes.
+PUBLIC_FEED_STATUSES = ("submitted", "validated", "in_progress", "resolved")
+# Citizen-written titles are only published once staff have reviewed the report.
+PUBLIC_TITLE_STATUSES = frozenset({"validated", "in_progress", "resolved"})
+POSTGRES_INTEGER_MAX = 2_147_483_647
+
+DUPLICATE_DEGREE_RADIUS = 0.0012
+DUPLICATE_ACTIONABLE_STATUSES = ("submitted", "validated", "in_progress", "duplicate")
+MAX_DUPLICATE_CANDIDATES = 10
+
+
 def _duplicate_candidates(
     *,
     category: str,
@@ -191,6 +208,34 @@ def _duplicate_candidates(
     exclude_id: str | None = None,
     db: Session | None = None,
 ) -> list[str]:
+    """Find open reports of the same kind within roughly 130 m.
+
+    In database mode the proximity test runs in SQL against an indexed column set,
+    so submitting a report stays O(matches) rather than O(all reports).
+    """
+    if settings.operational_persistence_backend == "database":
+        if db is None:
+            raise RuntimeError("A database session is required for report persistence")
+        statement = (
+            select(IssueReport.id)
+            .join(Neighborhood, Neighborhood.id == IssueReport.neighborhood_id)
+            .where(
+                Neighborhood.slug == neighborhood_slug,
+                IssueReport.category == category,
+                IssueReport.status.in_(DUPLICATE_ACTIONABLE_STATUSES),
+                IssueReport.latitude.is_not(None),
+                IssueReport.longitude.is_not(None),
+                and_(
+                    func.abs(IssueReport.latitude - latitude) <= DUPLICATE_DEGREE_RADIUS,
+                    func.abs(IssueReport.longitude - longitude) <= DUPLICATE_DEGREE_RADIUS,
+                ),
+            )
+            .order_by(IssueReport.created_at.desc(), IssueReport.id.desc())
+            .limit(MAX_DUPLICATE_CANDIDATES + 1)
+        )
+        found = [f"TRP-{1000 + row}" for row in db.scalars(statement).all()]
+        return [report_id for report_id in found if report_id != exclude_id][:MAX_DUPLICATE_CANDIDATES]
+
     candidates: list[str] = []
     for report in list_stored_reports(db):
         if report["id"] == exclude_id:
@@ -202,12 +247,14 @@ def _duplicate_candidates(
         nearby = (
             report_latitude is not None
             and report_longitude is not None
-            and abs(float(report_latitude) - latitude) <= 0.0012
-            and abs(float(report_longitude) - longitude) <= 0.0012
+            and abs(float(report_latitude) - latitude) <= DUPLICATE_DEGREE_RADIUS
+            and abs(float(report_longitude) - longitude) <= DUPLICATE_DEGREE_RADIUS
         )
         still_actionable = report["status"] not in {"resolved", "rejected"}
         if same_area and same_category and nearby and still_actionable:
             candidates.append(str(report["id"]))
+        if len(candidates) >= MAX_DUPLICATE_CANDIDATES:
+            break
     return candidates
 
 
@@ -220,7 +267,8 @@ def _database_report_id(report_id: str) -> int:
         numeric_id = int(report_id.removeprefix("TRP-")) - 1000
     except ValueError as exc:
         raise HTTPException(status_code=404, detail="Report not found") from exc
-    if numeric_id < 1:
+    # Out-of-range ids would make PostgreSQL raise "integer out of range" (a 500).
+    if numeric_id < 1 or numeric_id > POSTGRES_INTEGER_MAX:
         raise HTTPException(status_code=404, detail="Report not found")
     return numeric_id
 
@@ -255,18 +303,104 @@ def _database_report_to_dict(report: IssueReport) -> dict[str, Any]:
     }
 
 
-def list_stored_reports(db: Session | None = None) -> list[dict[str, Any]]:
+def list_stored_reports(
+    db: Session | None = None,
+    *,
+    category: str | None = None,
+    severity: str | None = None,
+    status: str | None = None,
+    statuses: tuple[str, ...] | None = None,
+    categories: tuple[str, ...] | None = None,
+    neighborhood_slug: str | None = None,
+    search: str | None = None,
+    created_by_email: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    """Read reports newest-first.
+
+    In database mode every filter is pushed into SQL so a large municipal backlog is
+    never pulled into the API process just to be filtered in Python.
+    """
     if settings.operational_persistence_backend == "database":
         if db is None:
             raise RuntimeError("A database session is required for report persistence")
-        reports = db.scalars(
+        statement = (
             select(IssueReport)
             .options(joinedload(IssueReport.neighborhood), joinedload(IssueReport.created_by))
             .order_by(IssueReport.created_at.desc(), IssueReport.id.desc())
-        ).all()
-        return [_database_report_to_dict(report) for report in reports]
+        )
+        if category:
+            statement = statement.where(IssueReport.category == category)
+        if severity:
+            statement = statement.where(IssueReport.severity == severity)
+        if status:
+            statement = statement.where(IssueReport.status == status)
+        if statuses:
+            statement = statement.where(IssueReport.status.in_(statuses))
+        if categories:
+            statement = statement.where(IssueReport.category.in_(categories))
+        if neighborhood_slug:
+            statement = statement.join(Neighborhood).where(Neighborhood.slug == neighborhood_slug)
+        if created_by_email:
+            statement = statement.join(User, IssueReport.created_by_id == User.id).where(
+                User.email == created_by_email
+            )
+        if search:
+            needle = f"%{_escape_like(search)}%"
+            statement = statement.where(
+                or_(
+                    IssueReport.title.ilike(needle, escape="\\"),
+                    IssueReport.description.ilike(needle, escape="\\"),
+                )
+            )
+        if offset:
+            statement = statement.offset(offset)
+        if limit is not None:
+            statement = statement.limit(limit)
+        return [_database_report_to_dict(report) for report in db.scalars(statement).all()]
+
     with _store_lock:
-        return deepcopy(_store())
+        reports = deepcopy(_store())
+    # Same order as the database path: newest first, then highest id.
+    reports.sort(key=lambda item: (item["created_at"], _report_number(str(item["id"]))), reverse=True)
+    if statuses:
+        reports = [report for report in reports if report["status"] in statuses]
+    if categories:
+        reports = [report for report in reports if report["category"] in categories]
+    reports = _filter_reports(
+        reports,
+        category=category,
+        severity=severity,
+        status=status,
+        neighborhood_slug=neighborhood_slug,
+    )
+    if created_by_email:
+        reports = [report for report in reports if report.get("created_by_email") == created_by_email]
+    if search:
+        needle = search.lower()
+        reports = [
+            report
+            for report in reports
+            if needle in report["title"].lower() or needle in report["description"].lower()
+        ]
+    if offset:
+        reports = reports[offset:]
+    if limit is not None:
+        reports = reports[:limit]
+    return reports
+
+
+def _report_number(report_id: str) -> int:
+    try:
+        return int(report_id.rsplit("-", 1)[-1])
+    except ValueError:
+        return 0
+
+
+def _escape_like(value: str) -> str:
+    """Neutralise LIKE wildcards so a search term cannot turn into a table scan pattern."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def get_stored_report(report_id: str, db: Session | None = None) -> dict[str, Any]:
@@ -288,30 +422,43 @@ def get_stored_report(report_id: str, db: Session | None = None) -> dict[str, An
     raise HTTPException(status_code=404, detail="Report not found")
 
 
-def set_stored_report_status(report_id: str, status: str, db: Session | None = None) -> dict[str, Any]:
+def set_stored_report_status(
+    report_id: str, status: str, db: Session | None = None
+) -> tuple[dict[str, Any], bool]:
+    """Apply a status transition and return (report, changed).
+
+    The change is flushed, not committed: the caller commits it together with its
+    audit event, so a status change can never persist without its audit record. In
+    database mode the row is locked, so two concurrent transitions (e.g. resolve and
+    reject) are serialised and the second is validated against the first.
+    """
     if settings.operational_persistence_backend == "database":
         if db is None:
             raise RuntimeError("A database session is required for report persistence")
         report = db.scalar(
             select(IssueReport)
-            .options(joinedload(IssueReport.neighborhood), joinedload(IssueReport.created_by))
             .where(IssueReport.id == _database_report_id(report_id))
+            .with_for_update()
         )
         if report is None:
             raise HTTPException(status_code=404, detail="Report not found")
+        if report.status == status:
+            return _database_report_to_dict(report), False
         _validate_status_transition(report.status, status)
         report.status = status
         report.resolved_at = _now() if status == "resolved" else None
-        db.commit()
-        db.refresh(report)
-        return _database_report_to_dict(report)
+        report.updated_at = _now()
+        db.flush()
+        return _database_report_to_dict(report), True
     with _store_lock:
         for report in _store():
             if report["id"] == report_id:
+                if report["status"] == status:
+                    return deepcopy(report), False
                 _validate_status_transition(str(report["status"]), status)
                 report["status"] = status
                 report["updated_at"] = _now()
-                return deepcopy(report)
+                return deepcopy(report), True
     raise HTTPException(status_code=404, detail="Report not found")
 
 
@@ -345,10 +492,18 @@ def _filter_reports(
 
 
 def _public_report(report: dict[str, Any]) -> PublicReportRead:
-    sensitive = report["category"] in {"security_incident", "medical_emergency", "fire_hazard"}
+    sensitive = report["category"] in SENSITIVE_CATEGORIES
+    created_at = report["created_at"]
+    if sensitive:
+        # Day precision only: an exact timestamp plus neighbourhood can identify who
+        # called about a medical or security incident.
+        created_at = created_at.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Unreviewed citizen text is never published verbatim (names, phone numbers or
+    # abuse typed into a title would otherwise go straight onto the public map).
+    publish_title = not sensitive and report["status"] in PUBLIC_TITLE_STATUSES
     return PublicReportRead(
         id=report["id"],
-        title="بلاغ قيد المراجعة" if sensitive else report["title"],
+        title=report["title"] if publish_title else "بلاغ قيد المراجعة",
         category=report["category"],
         severity=report["severity"],
         status=report["status"],
@@ -356,45 +511,83 @@ def _public_report(report: dict[str, Any]) -> PublicReportRead:
         neighborhood_slug=report["neighborhood_slug"],
         approximate_latitude=None if sensitive or report.get("latitude") is None else round(float(report["latitude"]), 3),
         approximate_longitude=None if sensitive or report.get("longitude") is None else round(float(report["longitude"]), 3),
-        created_at=report["created_at"],
+        created_at=created_at,
     )
+
+
+def _serialize_for(report: dict[str, Any], user: dict[str, Any]) -> ReportRead:
+    """Serialise a report for its viewer.
+
+    Duplicate candidates are ids of *other* people's reports near a point. For a
+    sensitive category they would reveal where hidden medical/security/fire reports
+    are, so only municipality roles see them.
+    """
+    serialized = _serialize(report)
+    if user["role"] not in REPORT_INTERNAL_VIEW_ROLES and report["category"] in SENSITIVE_CATEGORIES:
+        serialized.duplicate_candidates = []
+        serialized.duplicate_group_id = None
+    return serialized
+
+
+def _reject_control_characters(value: str | None, field: str) -> None:
+    if value is not None and contains_control_characters(value):
+        raise HTTPException(status_code=422, detail=f"{field} contains control characters")
 
 
 @router.get("", response_model=list[ReportRead])
 def list_reports(
-    category: str | None = None,
-    severity: str | None = None,
-    status: str | None = None,
-    neighborhood_slug: str | None = None,
+    category: ReportCategory | None = None,
+    severity: ReportSeverity | None = None,
+    status: ReportStatus | None = None,
+    neighborhood_slug: str | None = Query(default=None, max_length=120),
     search: str | None = Query(default=None, max_length=120),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0, le=100_000),
     _: dict[str, Any] = Depends(require_roles(*REPORT_INTERNAL_VIEW_ROLES)),
     db: Session = Depends(get_db),
 ) -> list[ReportRead]:
-    reports = _filter_reports(
-        list_stored_reports(db),
+    _reject_control_characters(search, "search")
+    _reject_control_characters(neighborhood_slug, "neighborhood_slug")
+    reports = list_stored_reports(
+        db,
         category=category,
         severity=severity,
         status=status,
         neighborhood_slug=neighborhood_slug,
+        search=search,
+        limit=min(limit, settings.reports_page_size_max),
+        offset=offset,
     )
-    if search:
-        needle = search.lower()
-        reports = [report for report in reports if needle in report["title"].lower() or needle in report["description"].lower()]
     return [_serialize(report) for report in reports]
 
 
 @router.get("/mine", response_model=list[ReportRead])
 def list_my_reports(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0, le=100_000),
     user: dict[str, Any] = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> list[ReportRead]:
-    reports = [report for report in list_stored_reports(db) if report.get("created_by_email") == user["email"]]
-    return [_serialize(report) for report in reports]
+    reports = list_stored_reports(db, created_by_email=user["email"], limit=limit, offset=offset)
+    return [_serialize_for(report, user) for report in reports]
 
 
 @router.get("/public", response_model=list[PublicReportRead])
-def list_public_reports(db: Session = Depends(get_db)) -> list[PublicReportRead]:
-    return [_public_report(report) for report in list_stored_reports(db)]
+def list_public_reports(
+    request: Request,
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0, le=100_000),
+    db: Session = Depends(get_db),
+) -> list[PublicReportRead]:
+    enforce_rate_limit(
+        request,
+        db,
+        scope="reports.public",
+        limit=settings.public_read_max_attempts,
+        window_seconds=settings.public_query_window_seconds,
+    )
+    reports = list_stored_reports(db, statuses=PUBLIC_FEED_STATUSES, limit=limit, offset=offset)
+    return [_public_report(report) for report in reports]
 
 
 @router.post("", response_model=ReportRead, status_code=201)
@@ -479,7 +672,7 @@ def create_report(
             details={"category": payload.category, "location_source": payload.location_source},
         )
         db.commit()
-        return _serialize(report)
+        return _serialize_for(report, user)
 
     with _store_lock:
         reports = _store()
@@ -520,7 +713,7 @@ def create_report(
             resource_id=report["id"],
             details={"category": payload.category, "location_source": payload.location_source},
         )
-        return _serialize(report)
+        return _serialize_for(report, user)
 
 
 @router.get("/{report_id}", response_model=ReportRead)
@@ -533,7 +726,7 @@ def get_report(
     owns_report = report.get("created_by_email") == user["email"]
     if user["role"] not in REPORT_INTERNAL_VIEW_ROLES and not owns_report:
         raise HTTPException(status_code=403, detail="Report details are limited to the reporter and municipality roles")
-    return _serialize(report)
+    return _serialize_for(report, user)
 
 
 @router.patch("/{report_id}/status", response_model=ReportRead)
@@ -544,16 +737,18 @@ def update_report_status(
     user: dict[str, Any] = Depends(require_roles(*REPORT_STATUS_ROLES)),
     db: Session = Depends(get_db),
 ) -> ReportRead:
-    report = set_stored_report_status(report_id, payload.status, db)
-    record_audit_event(
-        db,
-        request,
-        action="report.status_updated",
-        resource_type="report",
-        actor_email=user["email"],
-        resource_id=report_id,
-        details={"status": payload.status},
-    )
+    report, changed = set_stored_report_status(report_id, payload.status, db)
+    if changed:
+        record_audit_event(
+            db,
+            request,
+            action="report.status_updated",
+            resource_type="report",
+            actor_email=user["email"],
+            # Canonical id, never the raw path value (1005, TRP-01005, ...).
+            resource_id=report["id"],
+            details={"status": payload.status},
+        )
     db.commit()
     return _serialize(report)
 
@@ -581,6 +776,9 @@ def suggest_category(
         longitude=payload.longitude,
         db=db,
     ) if payload.neighborhood_slug and payload.latitude is not None and payload.longitude is not None else []
+    if user["role"] not in REPORT_INTERNAL_VIEW_ROLES and category in SENSITIVE_CATEGORIES:
+        # Otherwise any account could probe coordinates to locate hidden reports.
+        duplicates = []
     return ReportCategorySuggestion(
         category=category,
         confidence=confidence,

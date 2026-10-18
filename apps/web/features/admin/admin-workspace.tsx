@@ -5,52 +5,31 @@ import type { SmartReport } from "@citymind/shared";
 import Image from "next/image";
 
 import { CityMapCanvas, type CityMapSelection } from "@/components/map/city-map-canvas";
+import { ErrorState, LoadingState } from "@/components/ui/async-state";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable } from "@/components/ui/data-table";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Panel } from "@/components/ui/panel";
-import { categoryLabel, fallbackReports, reportCategories, reportStatuses, statusLabel } from "@/features/reports/report-options";
-import type { TripoliIssueMarker } from "@/features/map/tripoli-map-data";
-import { citymindApi, type AdminAsset, type AdminOverview, type AuthLoginResponse, type CityMindUser, type CityMindUserRole } from "@/lib/api-client";
-import { readStoredAuthSession, storeAuthSession } from "@/lib/auth-session";
+import { categoryLabel, reportCategories, reportStatuses, statusLabel } from "@/features/reports/report-options";
+import { ApiClientError, citymindApi, type AdminAsset, type AdminOverview, type CityMindUser, type CityMindUserRole } from "@/lib/api-client";
+import { readStoredAuthSession } from "@/lib/auth-session";
+import { smartReportMarkers } from "@/lib/map-markers";
+import { passwordProblem } from "@/lib/password-policy";
+import { apiErrorMessage } from "@/lib/use-api-resource";
 import { locationSourceLabelArabic, neighborhoodLabel, roleLabel, severityLabel, statusLabelArabic } from "@/lib/display-labels";
 
-const fallbackOverview: AdminOverview = {
-  portal_name: "بوابة البلدية",
-  role: "owner",
-  visible_categories: ["all"],
-  visibility_note: "احتياطي تجريبي محلي؛ سجّل الدخول لتحميل القوائم المفلترة من خدمة CityMind.",
-  notification_provider_status: "not_configured",
-  official_gis_status: "not_configured",
-  reports_total: 20,
-  assets_total: 10,
-  open_reports: 19,
-  pending_scenarios: 5,
-  active_predictions: 8,
-  monthly_summary: {
-    month: "حزيران 2026",
-    total_reports: 20,
-    open_reports: 19,
-    critical_reports: 1,
-    source: "demo_seed",
-  },
-  hotspots: [
-    {
-      name: "باب التبانة",
-      slug: "bab-al-tebbaneh",
-      category: "waste",
-      total_reports: 1,
-      open_reports: 1,
-      critical_reports: 1,
-      priority_score: 15,
-    },
-  ],
-};
+const PRE_HIJACK_MESSAGE =
+  "هذا البريد مسجّل كحساب مواطن أنشأه صاحبه. عيّن كلمة مرور جديدة عند منحه صلاحية موظف، حتى لا يبقى من سجّله قادرًا على الدخول.";
 
-const fallbackAssets: AdminAsset[] = [
-  { id: "asset-1", name: "مقطع طريق ساحلي في الميناء", asset_type: "road", status: "active", neighborhood_slug: "al-mina" },
-  { id: "asset-2", name: "مسار مشاة تراثي في الأسواق القديمة", asset_type: "sidewalk", status: "needs_maintenance", neighborhood_slug: "old-souks" },
-];
+function userSaveErrorMessage(caught: unknown): string {
+  if (caught instanceof ApiClientError && caught.status === 409) {
+    if (caught.message.includes("self-registered")) return PRE_HIJACK_MESSAGE;
+    if (caught.message.includes("owner")) return "يجب أن يبقى مالك نشط واحد على الأقل. رقِّ مالكًا آخر قبل تغيير هذا الحساب.";
+    return "تم تعديل هذا الحساب للتو من طلب آخر. حدّث الصفحة ثم أعد المحاولة.";
+  }
+  return apiErrorMessage(caught);
+}
 
 const operationsRoles: CityMindUserRole[] = ["owner", "municipality_admin", "decision_maker", "analyst", "police", "red_cross", "civil_defense"];
 const municipalityRoles: CityMindUserRole[] = ["owner", "municipality_admin", "decision_maker", "analyst"];
@@ -261,21 +240,21 @@ function agencyOperatorChecklist(role: CityMindUserRole | "not signed in", repor
 }
 
 export function AdminWorkspace() {
-  const [email, setEmail] = useState("owner.demo@citymind.local");
-  const [password, setPassword] = useState("");
-  const [token, setToken] = useState("");
   const [role, setRole] = useState<CityMindUserRole | "not signed in">("not signed in");
-  const [overview, setOverview] = useState(fallbackOverview);
-  const [reports, setReports] = useState<SmartReport[]>(fallbackReports);
-  const [assets, setAssets] = useState<AdminAsset[]>(fallbackAssets);
+  const [overview, setOverview] = useState<AdminOverview | null>(null);
+  const [reports, setReports] = useState<SmartReport[]>([]);
+  const [assets, setAssets] = useState<AdminAsset[]>([]);
   const [users, setUsers] = useState<CityMindUser[]>([]);
-  const [source, setSource] = useState<"api" | "locked">("locked");
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error" | "forbidden">("loading");
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [actionNotice, setActionNotice] = useState("");
+  const [reloadToken, setReloadToken] = useState(0);
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortMode, setSortMode] = useState<ReportSortMode>("triage");
-  const [selectedReportId, setSelectedReportId] = useState(fallbackReports[0]?.id ?? "");
-  const [authError, setAuthError] = useState("");
+  const [selectedReportId, setSelectedReportId] = useState("");
   const [newUser, setNewUser] = useState<CityMindUser>({
     full_name: "",
     email: "",
@@ -298,30 +277,20 @@ export function AdminWorkspace() {
 
   const selectedReport = filteredReports.find((report) => report.id === selectedReportId) ?? filteredReports[0] ?? null;
   const selectedReportChecklist = selectedReport ? agencyOperatorChecklist(role, selectedReport) : null;
-  const canUseAdmin = operationsRoles.includes(role as CityMindUserRole) && source === "api";
+  const canUseAdmin =
+    operationsRoles.includes(role as CityMindUserRole) && loadState === "ready" && overview !== null;
   const isAgencyRole = agencyRoles.includes(role as CityMindUserRole);
-  const canManageUsers = role === "owner" && source === "api";
-  const canManageAssets = municipalityRoles.includes(role as CityMindUserRole) && source === "api";
-  const visibleCategoryLabels = overview.visible_categories.includes("all")
-    ? "كل فئات البلاغات"
-    : overview.visible_categories
-        .filter((category) => category !== "all")
-        .map((category) => categoryLabel(category))
-        .join("، ");
-  const mappableReports = filteredReports
-    .filter((report) => report.latitude != null && report.longitude != null)
-    .map((report): TripoliIssueMarker => ({
-      id: report.id,
-      title: report.title,
-      description: report.description,
-      category: report.category,
-      severity: report.severity,
-      status: report.status === "duplicate" || report.status === "rejected" ? "resolved" : report.status,
-      neighborhood: report.neighborhood,
-      neighborhoodSlug: report.neighborhoodSlug ?? "manual-location",
-      latitude: report.latitude ?? 0,
-      longitude: report.longitude ?? 0,
-    }));
+  const canManageUsers = role === "owner" && loadState === "ready";
+  const canManageAssets = municipalityRoles.includes(role as CityMindUserRole) && loadState === "ready";
+  const visibleCategoryLabels = !overview
+    ? ""
+    : overview.visible_categories.includes("all")
+      ? "كل فئات البلاغات"
+      : overview.visible_categories
+          .filter((category) => category !== "all")
+          .map((category) => categoryLabel(category))
+          .join("، ");
+  const mappableReports = useMemo(() => smartReportMarkers(filteredReports), [filteredReports]);
   const selectedMappableReport = mappableReports.find((report) => report.id === selectedReportId);
   const selectedMapSelection: CityMapSelection | null = selectedMappableReport
     ? { type: "issue", item: selectedMappableReport }
@@ -332,110 +301,153 @@ export function AdminWorkspace() {
     setSelectedReportId(filteredReports[0].id);
   }, [filteredReports, selectedReportId]);
 
+  // The HttpOnly session cookie is the credential. This workspace only reads who is
+  // signed in so it can request the slices of data that role is allowed to see.
   useEffect(() => {
+    let active = true;
     const savedSession = readStoredAuthSession();
-    if (!savedSession) return;
-    try {
-      setEmail(savedSession.user.email);
-      void loadAdminData(savedSession);
-    } catch {
-      return;
-    }
-  }, []);
 
-  async function loadAdminData(auth: AuthLoginResponse) {
-    setRole(auth.user.role);
-
-    if (!operationsRoles.includes(auth.user.role)) {
-      setToken("");
-      setSource("locked");
-      setAuthError("هذا الحساب مخصص للمواطن فقط ولا يمكنه الوصول إلى عمليات الجهات أو البلدية.");
-      return;
-    }
-
-    const [adminOverview, adminReports, adminAssets, ownerUsers] = await Promise.all([
-      citymindApi.admin.overview(auth.access_token),
-      citymindApi.admin.reports(auth.access_token),
-      municipalityRoles.includes(auth.user.role) ? citymindApi.admin.assets(auth.access_token) : Promise.resolve([]),
-      auth.user.role === "owner" ? citymindApi.admin.users(auth.access_token) : Promise.resolve([]),
-    ]);
-
-    setToken(auth.access_token);
-    setOverview(adminOverview);
-    setReports(adminReports);
-    setSelectedReportId(adminReports[0]?.id ?? "");
-    setAssets(adminAssets);
-    setUsers(ownerUsers);
-    setSource("api");
-    setAuthError("");
-  }
-
-  async function login() {
-    try {
-      const auth = await citymindApi.auth.login(email, password);
-      storeAuthSession(auth);
-      const storedAuth = readStoredAuthSession() ?? auth;
-      setPassword("");
-      await loadAdminData(storedAuth);
-    } catch {
-      setToken("");
+    if (!savedSession) {
       setRole("not signed in");
-      setSource("locked");
-      setAuthError("تم رفض الوصول. استخدم حسابًا تجريبيًا لرئيس البلدية أو البلدية أو جهة مختصة.");
+      setLoadState("forbidden");
+      setLoadError("سجّل الدخول بحساب بلدي أو حساب جهة للوصول إلى هذه المساحة.");
+      return;
     }
-  }
+
+    const currentRole = savedSession.user.role;
+    setRole(currentRole);
+
+    if (!operationsRoles.includes(currentRole)) {
+      setLoadState("forbidden");
+      setLoadError("هذا الحساب مخصص للمواطن فقط ولا يمكنه الوصول إلى عمليات الجهات أو البلدية.");
+      return;
+    }
+
+    setLoadState("loading");
+    Promise.all([
+      citymindApi.admin.overview(),
+      citymindApi.admin.reports(),
+      municipalityRoles.includes(currentRole) ? citymindApi.admin.assets() : Promise.resolve([] as AdminAsset[]),
+      currentRole === "owner" ? citymindApi.admin.users() : Promise.resolve([] as CityMindUser[]),
+    ])
+      .then(([adminOverview, adminReports, adminAssets, ownerUsers]) => {
+        if (!active) return;
+        setOverview(adminOverview);
+        setReports(adminReports);
+        setSelectedReportId(adminReports[0]?.id ?? "");
+        setAssets(adminAssets);
+        setUsers(ownerUsers);
+        setLoadError("");
+        setLoadState("ready");
+      })
+      .catch((caught: unknown) => {
+        if (!active) return;
+        setLoadError(apiErrorMessage(caught));
+        setLoadState("error");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
 
   async function saveUser() {
-    if (!canManageUsers || !newUser.email.trim()) return;
-    const saved = await citymindApi.admin.upsertUser(token, newUser);
-    setUsers((current) => {
-      const exists = current.some((user) => user.email === saved.email);
-      return exists ? current.map((user) => (user.email === saved.email ? saved : user)) : [...current, saved];
-    });
-    setNewUser({ full_name: "", email: "", role: "citizen", password: "", is_active: true });
+    if (!canManageUsers) return;
+    setActionError("");
+    setActionNotice("");
+    const email = newUser.email.trim().toLowerCase();
+    const password = newUser.password?.trim() ? newUser.password : undefined;
+    const existingUser = users.find((user) => user.email === email);
+    const isExisting = Boolean(existingUser);
+
+    if (newUser.full_name.trim().length < 2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      setActionError("أدخل اسمًا كاملًا وبريدًا إلكترونيًا صالحًا.");
+      return;
+    }
+    if (!isExisting && !password) {
+      setActionError("كلمة مرور مؤقتة مطلوبة عند إنشاء مستخدم جديد.");
+      return;
+    }
+    if (existingUser?.role === "citizen" && newUser.role !== "citizen" && !password) {
+      // Mirrors the API: a self-registered account keeps its registrant's password
+      // unless a new one is set, so granting a staff role requires one.
+      setActionError(PRE_HIJACK_MESSAGE);
+      return;
+    }
+    const problem = password ? passwordProblem(password, email) : null;
+    if (problem) {
+      setActionError(problem);
+      return;
+    }
+
+    try {
+      // An empty password means "keep the current one"; sending "" would be rejected.
+      const saved = await citymindApi.admin.upsertUser({ ...newUser, email, password });
+      setActionNotice(isExisting ? `تم تحديث صلاحيات ${saved.email}.` : `تم إنشاء حساب ${saved.email}.`);
+      setUsers((current) => {
+        const exists = current.some((user) => user.email === saved.email);
+        return exists ? current.map((user) => (user.email === saved.email ? saved : user)) : [...current, saved];
+      });
+      setNewUser({ full_name: "", email: "", role: "citizen", password: "", is_active: true });
+    } catch (caught) {
+      setActionError(userSaveErrorMessage(caught));
+    }
   }
 
   async function updateReport(id: string, status: SmartReport["status"]) {
     if (!canUseAdmin) return;
-    const updated = await citymindApi.admin.updateReportStatus(token, id, status);
-    setReports((current) => current.map((report) => (report.id === id ? updated : report)));
+    setActionError("");
+    try {
+      const updated = await citymindApi.admin.updateReportStatus(id, status);
+      setReports((current) => current.map((report) => (report.id === id ? updated : report)));
+    } catch (caught) {
+      setActionError(apiErrorMessage(caught));
+    }
   }
 
   async function updateAsset(id: string, status: AdminAsset["status"]) {
     if (!canUseAdmin) return;
-    const updated = await citymindApi.admin.updateAssetStatus(token, id, status);
-    setAssets((current) => current.map((asset) => (asset.id === id ? updated : asset)));
+    setActionError("");
+    try {
+      const updated = await citymindApi.admin.updateAssetStatus(id, status);
+      setAssets((current) => current.map((asset) => (asset.id === id ? updated : asset)));
+    } catch (caught) {
+      setActionError(apiErrorMessage(caught));
+    }
   }
 
   return (
     <div className="space-y-6">
-      {!canUseAdmin ? (
-        <Panel title="دخول رئيس البلدية والبلدية والجهات" eyebrow="وصول محلي" action={<Badge tone={source === "api" ? "green" : "amber"}>{roleLabel(role)}</Badge>}>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <input
-              className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              aria-label="بريد الإدارة"
-              type="email"
-            />
-            <input
-              className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              aria-label="كلمة مرور الإدارة"
-              placeholder="كلمة المرور"
-              type="password"
-            />
-            <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="button" onClick={login}>
-              تسجيل دخول محلي
-            </button>
-          </div>
-          {authError ? <p className="mt-3 text-sm font-medium text-rose-700">{authError}</p> : null}
+      {loadState === "loading" ? <LoadingState label="جارٍ تحميل مساحة العمل التشغيلية" /> : null}
+
+      {loadState === "error" ? (
+        <ErrorState message={loadError} onRetry={() => setReloadToken((current) => current + 1)} />
+      ) : null}
+
+      {loadState === "forbidden" ? (
+        <Panel
+          title="وصول مقيّد"
+          eyebrow="صلاحيات الجهات"
+          action={<Badge tone="amber">{roleLabel(role)}</Badge>}
+        >
+          <EmptyState title="لا تملك صلاحية هذه المساحة" description={loadError} />
         </Panel>
       ) : null}
 
-      {canUseAdmin ? (
+      <div aria-live="polite">
+        {actionError ? (
+          <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-rose-800" role="alert">
+            {actionError}
+          </p>
+        ) : null}
+        {actionNotice ? (
+          <p className="rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm leading-6 text-teal-900" role="status">
+            {actionNotice}
+          </p>
+        ) : null}
+      </div>
+
+      {canUseAdmin && overview ? (
         <>
           <section className={isAgencyRole ? "grid gap-4 md:grid-cols-3" : "grid gap-4 md:grid-cols-2 xl:grid-cols-5"}>
             <MetricCard label="البلاغات" value={String(overview.reports_total)} detail={`قائمة ${portalLabel(overview.portal_name)}`} tone="blue" />
@@ -479,25 +491,37 @@ export function AdminWorkspace() {
             <Panel title="إدارة الصلاحيات" eyebrow="لرئيس البلدية فقط" action={<Badge tone="blue">{users.length} مستخدمين</Badge>}>
               <div className="grid gap-3 lg:grid-cols-[1fr_1fr_180px_180px_120px]">
                 <input
+                  aria-label="الاسم الكامل للمستخدم"
+                  autoComplete="off"
                   className="min-w-0 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  maxLength={255}
                   placeholder="الاسم الكامل"
                   value={newUser.full_name}
                   onChange={(event) => setNewUser((current) => ({ ...current, full_name: event.target.value }))}
                 />
                 <input
+                  aria-label="البريد الإلكتروني للمستخدم"
+                  autoComplete="off"
                   className="min-w-0 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  dir="ltr"
+                  maxLength={255}
                   placeholder="email@example.com"
+                  type="email"
                   value={newUser.email}
                   onChange={(event) => setNewUser((current) => ({ ...current, email: event.target.value }))}
                 />
                 <input
+                  aria-label="كلمة مرور مؤقتة (اتركها فارغة للإبقاء على الحالية)"
+                  autoComplete="new-password"
                   className="min-w-0 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  maxLength={128}
                   placeholder="كلمة مرور مؤقتة"
                   type="password"
                   value={newUser.password ?? ""}
                   onChange={(event) => setNewUser((current) => ({ ...current, password: event.target.value }))}
                 />
                 <select
+                  aria-label="دور المستخدم"
                   className="rounded-md border border-slate-300 px-3 py-2 text-sm"
                   value={newUser.role}
                   onChange={(event) => setNewUser((current) => ({ ...current, role: event.target.value as CityMindUserRole }))}

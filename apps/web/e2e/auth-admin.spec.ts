@@ -31,7 +31,14 @@ test("visitor can open register page and create a citizen account", async ({ pag
   await expectPageReady(page, "إنشاء حساب جديد");
   await page.getByLabel("الاسم الكامل").fill("مواطن جديد");
   await page.getByLabel("البريد الإلكتروني").fill("new.citizen@example.com");
-  await page.getByLabel("كلمة المرور").fill("citizen-pass");
+  await page.getByLabel("كلمة المرور", { exact: true }).fill("weakpass");
+  await expect(page.getByText("يجب أن تتكون كلمة المرور من 10 أحرف على الأقل.")).toBeVisible();
+  await page.getByLabel("كلمة المرور", { exact: true }).fill("Tripoli-Citizen-92");
+  await page.getByLabel("تأكيد كلمة المرور").fill("Tripoli-Citizen-92");
+  await page.getByRole("button", { name: "إنشاء حساب" }).click();
+  // Consent is required before the account is created.
+  await expect(page.getByText("يجب الموافقة على سياسة الخصوصية لإنشاء حساب.")).toBeVisible();
+  await page.getByRole("checkbox", { name: /أوافق على معالجة بياناتي/ }).check();
   await page.getByRole("button", { name: "إنشاء حساب" }).click();
 
   await expectPageReady(page, "خدمات المواطنين في CityMind Tripoli");
@@ -55,7 +62,7 @@ test("admin page loads after owner email and password auth succeeds", async ({ p
 
   await page.getByPlaceholder("الاسم الكامل").fill("E2E Analyst");
   await page.getByPlaceholder("email@example.com").fill("analyst@example.com");
-  await page.getByPlaceholder("كلمة مرور مؤقتة").fill("analyst-demo");
+  await page.getByPlaceholder("كلمة مرور مؤقتة").fill("Trablous-Data-2026");
   await page.getByRole("button", { name: "حفظ الصلاحية" }).click();
   await expect(page.getByRole("cell", { name: "analyst@example.com" })).toBeVisible();
 

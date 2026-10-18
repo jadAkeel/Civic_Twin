@@ -8,7 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.green_metric import GreenMetric
 from app.models.issue_report import IssueReport
@@ -153,10 +153,15 @@ def save_database_result(
 
 
 def list_database_results(db: Session, limit: int) -> list[dict[str, Any]]:
+    # joinedload keeps this to one query; row.scenario.name would otherwise issue
+    # one extra SELECT per result.
     rows = db.scalars(
-        select(ScenarioResult).order_by(ScenarioResult.created_at.desc(), ScenarioResult.id.desc()).limit(limit)
+        select(ScenarioResult)
+        .options(joinedload(ScenarioResult.scenario))
+        .order_by(ScenarioResult.created_at.desc(), ScenarioResult.id.desc())
+        .limit(limit)
     ).all()
-    return [_serialize_database_result(row, row.scenario.name) for row in rows]
+    return [_serialize_database_result(row, row.scenario.name if row.scenario else "") for row in rows]
 
 
 def _serialize_database_result(row: ScenarioResult, scenario_name: str) -> dict[str, Any]:

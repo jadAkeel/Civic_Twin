@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from typing import Literal
 
@@ -26,9 +27,20 @@ MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
 
 
+# C0 controls except tab/newline/carriage return, plus DEL. PostgreSQL rejects NUL
+# outright (a 500 in database mode) and the rest only corrupt display.
+CONTROL_CHARACTERS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
+MIN_TEXT_LENGTHS = {"title": 3, "description": 10}
+
+
 def _contains_unsafe_text(value: str) -> bool:
     lowered = value.lower()
     return "<script" in lowered or "javascript:" in lowered or "data:text/html" in lowered
+
+
+def contains_control_characters(value: str) -> bool:
+    return bool(CONTROL_CHARACTERS.search(value))
 
 
 class ReportImageMetadata(BaseModel):
@@ -40,7 +52,12 @@ class ReportImageMetadata(BaseModel):
     @classmethod
     def validate_filename(cls, value: str) -> str:
         clean_value = value.strip()
-        if _contains_unsafe_text(clean_value) or any(separator in clean_value for separator in ("/", "\\")):
+        if (
+            not clean_value
+            or _contains_unsafe_text(clean_value)
+            or contains_control_characters(clean_value)
+            or any(separator in clean_value for separator in ("/", "\\"))
+        ):
             raise ValueError("Image filename is not safe")
         return clean_value
 
@@ -65,7 +82,7 @@ class ReportCreate(BaseModel):
     description: str = Field(min_length=10, max_length=1200)
     category: ReportCategory
     severity: ReportSeverity
-    neighborhood_slug: str | None = Field(default=None, min_length=2, max_length=120)
+    neighborhood_slug: str | None = Field(default=None, min_length=2, max_length=120, pattern=SLUG_PATTERN)
     latitude: float | None = Field(default=None, ge=TRIPOLI_LATITUDE_MIN, le=TRIPOLI_LATITUDE_MAX)
     longitude: float | None = Field(default=None, ge=TRIPOLI_LONGITUDE_MIN, le=TRIPOLI_LONGITUDE_MAX)
     manual_location: str | None = Field(default=None, max_length=240)
@@ -76,12 +93,20 @@ class ReportCreate(BaseModel):
 
     @field_validator("title", "description", "manual_location")
     @classmethod
-    def validate_safe_text(cls, value: str | None) -> str | None:
+    def validate_safe_text(cls, value: str | None, info) -> str | None:  # noqa: ANN001 - pydantic ValidationInfo
         if value is None:
             return value
+        if contains_control_characters(value):
+            raise ValueError("Text contains control characters")
         clean_value = value.strip()
         if _contains_unsafe_text(clean_value):
             raise ValueError("Text contains unsafe markup")
+        # Field min_length runs before stripping, so "   x   " would otherwise pass.
+        minimum = MIN_TEXT_LENGTHS.get(info.field_name)
+        if minimum is not None and len(clean_value) < minimum:
+            raise ValueError(f"Must contain at least {minimum} visible characters")
+        if info.field_name == "manual_location" and not clean_value:
+            return None
         return clean_value
 
     @model_validator(mode="after")

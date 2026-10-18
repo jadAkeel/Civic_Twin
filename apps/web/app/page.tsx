@@ -4,36 +4,36 @@ const citizenActions = [
   {
     title: "الإبلاغ عن ازدحام مروري",
     description: "أرسل بلاغًا عن الازدحام مع الموقع والوصف وصورة اختيارية.",
-    href: "/reports",
+    href: "/reports?category=traffic_congestion",
   },
   {
     title: "الإبلاغ عن حفرة أو ضرر في الطريق",
     description: "بلّغ عن ضرر في الطريق من دون أي تقدير وهمي للعمق أو الحجم.",
-    href: "/reports",
+    href: "/reports?category=pothole",
   },
   {
     title: "الإبلاغ عن مشكلة نفايات",
     description: "أخبر البلدية بمكان تراكم النفايات أو الحاجة إلى مراجعة الجمع.",
-    href: "/reports",
+    href: "/reports?category=waste",
   },
   {
     title: "الإبلاغ عن حادث أمني أو سلامة عامة",
     description: "أرسل وصفًا حذرًا للسلامة العامة لمراجعة البلدية يدويًا.",
-    href: "/reports",
+    href: "/reports?category=security_incident",
   },
   {
     title: "إرسال بلاغ طبي للمراجعة",
     description: "سجّل حالة طبية للمراجعة اليدوية، من دون إرسال إسعافي تلقائي.",
-    href: "/reports",
+    href: "/reports?category=medical_emergency",
   },
   {
     title: "الإبلاغ عن خطر حريق",
     description: "أضف وصفًا وموقعًا لخطر حريق أو إنقاذ للمراجعة اليدوية.",
-    href: "/reports",
+    href: "/reports?category=fire_hazard",
   },
   {
     title: "إرشاد مسارات المشي",
-    description: "اطّلع على حالة عدم التوفر الحالية والبيانات المطلوبة لإرشاد آمن.",
+    description: "جرّب مسارات مشي تجريبية بين نقاط معروفة، مع توضيح البيانات الرسمية التي لم تُربط بعد.",
     href: "/mobility",
   },
 ];
@@ -48,7 +48,7 @@ export default function HomePage() {
             خدمات المواطنين في CityMind Tripoli
           </h1>
           <p className="mt-4 text-base leading-7 text-slate-700">
-            بلّغ عن مشكلة في المدينة من هاتفك، ويمكنك إرفاق صورة أو مشاركة موقع GPS مؤقتًا، ثم تحصل على تأكيد واضح للبلاغ.
+            بلّغ عن مشكلة في المدينة من هاتفك، وحدّد الموقع عبر GPS أو الخريطة، ثم تحصل على رقم مرجعي وتأكيد واضح للبلاغ وتتابع حالته.
           </p>
         </div>
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
